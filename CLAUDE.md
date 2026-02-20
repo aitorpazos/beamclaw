@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## State Management
+- **Task List**: Always read and update @STATUS.md before and after every task.
+- **Decision Log**: Consult @DECISIONS.md before suggesting architectural changes.
+- **Progress Tracking**: If context window exceeds 80%, summarize the current sub-task into STATUS.md and prompt for a `/compact`.
+
 ## Project Overview
 
 BeamClaw is a fault-tolerant AI agent gateway and MCP (Model Context Protocol) host implemented in
