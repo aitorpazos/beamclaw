@@ -37,8 +37,8 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| `bc_memory` | ⬜ | behaviour |
-| `bc_memory_ets` | ⬜ | in-process ETS backend |
+| `bc_memory` | ✅ | behaviour |
+| `bc_memory_ets` | ✅ | in-process ETS backend |
 | `bc_memory_sqlite` | ⬜ | persistent SQLite backend |
 
 ### M3 — Tool Registry ⬜
