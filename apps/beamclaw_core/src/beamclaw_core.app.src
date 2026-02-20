@@ -1,0 +1,10 @@
+{application, beamclaw_core,
+ [{description,  "BeamClaw core: sessions, agentic loop, LLM providers"},
+  {vsn,          "0.1.0"},
+  {registered,   [bc_session_registry, beamclaw_core_sup, bc_sessions_sup]},
+  {mod,          {beamclaw_core_app, []}},
+  {applications, [kernel, stdlib, inets, ssl,
+                  beamclaw_obs, beamclaw_memory, beamclaw_tools, beamclaw_mcp]},
+  {env,          []},
+  {modules,      []}
+ ]}.

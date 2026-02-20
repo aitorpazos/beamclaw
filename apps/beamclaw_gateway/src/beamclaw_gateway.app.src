@@ -1,0 +1,9 @@
+{application, beamclaw_gateway,
+ [{description,  "BeamClaw gateway: channels, HTTP, rate limiting"},
+  {vsn,          "0.1.0"},
+  {registered,   [bc_rate_limiter, beamclaw_gateway_sup]},
+  {mod,          {beamclaw_gateway_app, []}},
+  {applications, [kernel, stdlib, cowboy, beamclaw_core, beamclaw_obs]},
+  {env,          []},
+  {modules,      []}
+ ]}.

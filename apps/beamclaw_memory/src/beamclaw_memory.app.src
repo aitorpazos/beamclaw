@@ -1,0 +1,9 @@
+{application, beamclaw_memory,
+ [{description,  "BeamClaw memory backends"},
+  {vsn,          "0.1.0"},
+  {registered,   []},
+  {mod,          {beamclaw_memory_app, []}},
+  {applications, [kernel, stdlib, beamclaw_obs]},
+  {env,          []},
+  {modules,      []}
+ ]}.

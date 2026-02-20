@@ -1,0 +1,144 @@
+%% @doc Telegram channel — long-poll or webhook mode.
+%% Implements bc_channel behaviour.
+-module(bc_channel_telegram).
+-behaviour(gen_server).
+%% Implements bc_channel callbacks.
+
+-include_lib("beamclaw_core/include/bc_types.hrl").
+
+-export([start_link/1, handle_webhook/1]).
+-export([listen/1, send/3, send_typing/2, update_draft/4, finalize_draft/3]).
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
+
+start_link(Config) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, Config, []).
+
+%% bc_channel callbacks
+init(Config) ->
+    Token = bc_config:resolve(maps:get(token, Config, {env, "TELEGRAM_BOT_TOKEN"})),
+    Mode  = maps:get(mode, Config, long_poll),
+    State = #{token => Token, mode => Mode, offset => 0, seen_ids => sets:new()},
+    case Mode of
+        long_poll -> self() ! poll;
+        webhook   -> ok
+    end,
+    {ok, State}.
+
+listen(State) ->
+    {ok, State}.
+
+send(SessionId, #bc_message{content = Content}, State) ->
+    ChatId = resolve_chat_id(SessionId, State),
+    send_message(ChatId, Content, State),
+    {ok, State}.
+
+send_typing(SessionId, State) ->
+    ChatId = resolve_chat_id(SessionId, State),
+    send_action(ChatId, <<"typing">>, State),
+    ok.
+
+update_draft(SessionId, DraftId, Content, State) ->
+    ChatId = resolve_chat_id(SessionId, State),
+    edit_message(ChatId, DraftId, Content, State),
+    {ok, State}.
+
+finalize_draft(_SessionId, _DraftId, State) ->
+    {ok, State}.
+
+handle_webhook(Update) ->
+    dispatch_telegram_message(Update).
+
+%% gen_server callbacks
+handle_info(poll, State) ->
+    Offset  = maps:get(offset, State, 0),
+    Updates = get_updates(Offset, State),
+    {NewOffset, Seen} = process_updates(Updates, State),
+    erlang:send_after(1000, self(), poll),
+    {noreply, State#{offset => NewOffset, seen_ids => Seen}};
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+handle_call(_Req, _From, State) -> {reply, {error, unknown}, State}.
+handle_cast(_Msg, State)        -> {noreply, State}.
+
+terminate(_Reason, _State) -> ok.
+code_change(_OldVsn, State, _) -> {ok, State}.
+
+%% Internal
+
+get_updates(Offset, #{token := Token}) ->
+    Url = "https://api.telegram.org/bot" ++ binary_to_list(Token) ++
+          "/getUpdates?offset=" ++ integer_to_list(Offset) ++ "&timeout=30",
+    case httpc:request(get, {Url, []}, [{timeout, 35000}], []) of
+        {ok, {{_, 200, _}, _, Body}} ->
+            Decoded = jsx:decode(iolist_to_binary(Body), [return_maps]),
+            maps:get(<<"result">>, Decoded, []);
+        _ -> []
+    end.
+
+process_updates([], State) ->
+    {maps:get(offset, State, 0), maps:get(seen_ids, State, sets:new())};
+process_updates(Updates, State) ->
+    SeenIds = maps:get(seen_ids, State, sets:new()),
+    {NewSeen, MaxId} = lists:foldl(fun(Update, {Seen, Max}) ->
+        UpdateId = maps:get(<<"update_id">>, Update, 0),
+        Msg      = maps:get(<<"message">>,   Update, #{}),
+        MsgId    = maps:get(<<"message_id">>, Msg, 0),
+        case sets:is_element(MsgId, Seen) of
+            true  -> {Seen, max(Max, UpdateId)};
+            false ->
+                dispatch_telegram_message(Update),
+                {sets:add_element(MsgId, Seen), max(Max, UpdateId)}
+        end
+    end, {SeenIds, maps:get(offset, State, 0)}, Updates),
+    {MaxId + 1, NewSeen}.
+
+dispatch_telegram_message(Update) ->
+    Msg    = maps:get(<<"message">>, Update, #{}),
+    Text   = maps:get(<<"text">>,    Msg,    <<>>),
+    From   = maps:get(<<"from">>,    Msg,    #{}),
+    Chat   = maps:get(<<"chat">>,    Msg,    #{}),
+    UserId = integer_to_binary(maps:get(<<"id">>, From, 0)),
+    ChatId = integer_to_binary(maps:get(<<"id">>, Chat, 0)),
+    ChannelMsg = #bc_channel_message{
+        session_id = ChatId,
+        user_id    = UserId,
+        channel    = telegram,
+        content    = Text,
+        raw        = Msg,
+        ts         = erlang:system_time(millisecond)
+    },
+    case bc_session_registry:lookup(ChatId) of
+        {ok, Pid} -> bc_session:dispatch_run(Pid, ChannelMsg);
+        {error, not_found} ->
+            %% Create new session
+            Config = #{session_id  => ChatId,
+                       user_id     => UserId,
+                       channel_id  => ChatId,
+                       channel_mod => bc_channel_telegram},
+            {ok, _} = bc_sessions_sup:start_session(Config),
+            timer:sleep(100), %% Wait for session to register
+            case bc_session_registry:lookup(ChatId) of
+                {ok, Pid} -> bc_session:dispatch_run(Pid, ChannelMsg);
+                _          -> ok
+            end
+    end.
+
+send_message(ChatId, Text, #{token := Token}) ->
+    Url  = "https://api.telegram.org/bot" ++ binary_to_list(Token) ++ "/sendMessage",
+    Body = jsx:encode(#{chat_id => ChatId, text => Text}),
+    httpc:request(post, {Url, [], "application/json", Body}, [], []).
+
+send_action(ChatId, Action, #{token := Token}) ->
+    Url  = "https://api.telegram.org/bot" ++ binary_to_list(Token) ++ "/sendChatAction",
+    Body = jsx:encode(#{chat_id => ChatId, action => Action}),
+    httpc:request(post, {Url, [], "application/json", Body}, [], []).
+
+edit_message(ChatId, MessageId, Text, #{token := Token}) ->
+    Url  = "https://api.telegram.org/bot" ++ binary_to_list(Token) ++ "/editMessageText",
+    Body = jsx:encode(#{chat_id => ChatId, message_id => MessageId, text => Text}),
+    httpc:request(post, {Url, [], "application/json", Body}, [], []).
+
+resolve_chat_id(SessionId, _State) ->
+    SessionId.

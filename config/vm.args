@@ -1,0 +1,23 @@
+## Node name
+-name beamclaw@127.0.0.1
+
+## Cookie
+-setcookie beamclaw_dev
+
+## Heartbeat management; auto-restarts VM if it stops responding
+## -heart
+
+## Enable SMP automatically based on availability
++S auto
+
+## Increase number of concurrent ports/sockets
++Q 65536
+
+## Set the scheduler busy wait threshold
++sbwt none
+
+## Set async threads
++A 32
+
+## Crash dump location
+-env ERL_CRASH_DUMP /tmp/beamclaw_erl_crash.dump

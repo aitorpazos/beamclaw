@@ -1,0 +1,137 @@
+%% @doc Session gen_server — the "lane."
+%%
+%% Permanent process. Holds conversation history and serializes runs via a
+%% pending_runs queue. When the loop is busy, incoming runs are enqueued.
+%% When the loop completes (turn_complete), the next run is dispatched.
+%%
+%% History survives loop crashes because bc_session is permanent and bc_loop is transient.
+-module(bc_session).
+-behaviour(gen_server).
+
+-include_lib("beamclaw_core/include/bc_types.hrl").
+
+-export([start_link/1,
+         dispatch_run/2,
+         get_history/1,
+         append_message/2,
+         set_loop_pid/2,
+         turn_complete/2]).
+
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
+
+-record(state, {
+    session_id    :: binary(),
+    user_id       :: binary(),
+    channel_id    :: binary(),
+    autonomy      :: autonomy_level(),
+    loop_pid      :: pid() | undefined,
+    provider_mod  :: module(),
+    memory_mod    :: module(),
+    history       :: [#bc_message{}],
+    pending_runs  :: queue:queue(),
+    config        :: map()
+}).
+
+start_link(Config) ->
+    gen_server:start_link(?MODULE, Config, []).
+
+%% @doc Dispatch a new user run (message) to this session.
+-spec dispatch_run(Pid :: pid(), Message :: #bc_channel_message{}) -> ok.
+dispatch_run(Pid, Message) ->
+    gen_server:cast(Pid, {dispatch_run, Message}).
+
+%% @doc Retrieve the full conversation history.
+-spec get_history(Pid :: pid()) -> [#bc_message{}].
+get_history(Pid) ->
+    gen_server:call(Pid, get_history).
+
+%% @doc Append a message to history (called by bc_loop).
+-spec append_message(Pid :: pid(), Message :: #bc_message{}) -> ok.
+append_message(Pid, Message) ->
+    gen_server:cast(Pid, {append_message, Message}).
+
+%% @doc Update the loop pid reference.
+-spec set_loop_pid(Pid :: pid(), LoopPid :: pid()) -> ok.
+set_loop_pid(Pid, LoopPid) ->
+    gen_server:cast(Pid, {set_loop_pid, LoopPid}).
+
+%% @doc Called by bc_loop when a turn completes. Dequeues next run if any.
+-spec turn_complete(Pid :: pid(), Result :: term()) -> ok.
+turn_complete(Pid, Result) ->
+    gen_server:cast(Pid, {turn_complete, Result}).
+
+init(Config) ->
+    SessionId = maps:get(session_id, Config, generate_id()),
+    bc_session_registry:register(SessionId, self()),
+    bc_obs:emit(session_start, #{session_id => SessionId}),
+    State = #state{
+        session_id   = SessionId,
+        user_id      = maps:get(user_id,      Config, <<"anonymous">>),
+        channel_id   = maps:get(channel_id,   Config, <<"default">>),
+        autonomy     = maps:get(autonomy,      Config,
+                           bc_config:get(beamclaw_core, autonomy_level, supervised)),
+        loop_pid     = undefined,
+        provider_mod = maps:get(provider_mod, Config, bc_provider_openrouter),
+        memory_mod   = maps:get(memory_mod,   Config, bc_memory_ets),
+        history      = [],
+        pending_runs = queue:new(),
+        config       = Config
+    },
+    {ok, State}.
+
+handle_cast({dispatch_run, Message}, #state{loop_pid = undefined} = State) ->
+    %% Loop is idle — dispatch immediately
+    send_to_loop(Message, State),
+    {noreply, State};
+handle_cast({dispatch_run, Message}, State) ->
+    %% Loop is busy — enqueue
+    NewQueue = queue:in(Message, State#state.pending_runs),
+    {noreply, State#state{pending_runs = NewQueue}};
+
+handle_cast({append_message, Msg}, State) ->
+    {noreply, State#state{history = State#state.history ++ [Msg]}};
+
+handle_cast({set_loop_pid, Pid}, State) ->
+    {noreply, State#state{loop_pid = Pid}};
+
+handle_cast({turn_complete, _Result}, State) ->
+    case queue:out(State#state.pending_runs) of
+        {{value, NextMsg}, Rest} ->
+            send_to_loop(NextMsg, State),
+            {noreply, State#state{pending_runs = Rest}};
+        {empty, _} ->
+            {noreply, State#state{loop_pid = undefined}}
+    end;
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_call(get_history, _From, State) ->
+    {reply, State#state.history, State};
+handle_call(_Req, _From, State) ->
+    {reply, {error, unknown}, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(Reason, State) ->
+    bc_obs:emit(session_end, #{session_id => State#state.session_id,
+                               reason => Reason}),
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%% Internal
+
+send_to_loop(Message, #state{loop_pid = Pid}) when is_pid(Pid) ->
+    gen_statem:cast(Pid, {run, Message});
+send_to_loop(_Message, _State) ->
+    ok. %% Loop not started yet; will be dispatched on loop init
+
+generate_id() ->
+    <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
+    iolist_to_binary(io_lib:format(
+        "~8.16.0b-~4.16.0b-4~3.16.0b-~4.16.0b-~12.16.0b",
+        [A, B, C band 16#0fff, D band 16#3fff bor 16#8000, E])).
