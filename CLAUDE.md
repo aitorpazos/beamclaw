@@ -9,9 +9,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BeamClaw is a fault-tolerant AI agent gateway and MCP (Model Context Protocol) host implemented in
-Erlang/OTP 28, built as a rebar3 umbrella project. It is architecturally inspired by ZeroClaw (Rust)
-and OpenClaw (TypeScript), porting their best ideas into idiomatic OTP.
+BeamClaw is a fault-tolerant, security-conscious AI agent gateway and MCP (Model Context
+Protocol) host implemented in Erlang/OTP 28, built as a rebar3 umbrella project. It is
+architecturally inspired by ZeroClaw (Rust) and OpenClaw (TypeScript), porting their best
+ideas into idiomatic OTP.
+
+**Project goals**: fault tolerance · observability · security · extensibility
+
+## Security Rules
+
+Security is a first-class project goal. The rules below apply to all code,
+configuration, and documentation changes.
+
+### Secret handling — configuration
+- **Never hardcode secrets.** API keys, tokens, and passwords MUST be expressed
+  as `{env, "VAR_NAME"}` tuples in `config/sys.config`, resolved at runtime by
+  `bc_config:get/2`. Hardcoded credentials in source files or config are a
+  blocking review issue.
+- **`.env` files and `*.secret` files must never be committed.** The `.gitignore`
+  must exclude `*.env`, `.env`, `*.secret`, `priv/secrets/`, and similar paths.
+  Warn before staging any file whose name matches these patterns.
+
+### Secret handling — runtime
+- **`bc_scrubber` is mandatory on all tool results.** Every value returned by a
+  tool (`bc_tool_*:execute/3`) and every LLM API response MUST pass through
+  `bc_scrubber:scrub/1` before being stored in session history or logged.
+  `bc_loop` applies this at the boundary — never bypass it.
+- **Keep `bc_scrubber` patterns current.** When adding support for a new API or
+  service whose keys have a recognizable prefix (e.g. `sk-proj-`, `xoxb-` for
+  Slack), add the pattern to `bc_scrubber` in the same PR that introduces the
+  integration.
+- **Never pass raw secrets as tool arguments.** If a tool needs an API key (e.g.
+  `bc_tool_curl` calling an authenticated endpoint), the key should be injected
+  from the environment inside the tool implementation — not passed as a literal
+  string in the LLM tool call arguments. Tool arguments are logged and stored in
+  history.
+
+### Secret handling — logging
+- **Observability events must not contain raw secret values.** `bc_obs:emit/2`
+  calls that include `args` or `result` fields must use the scrubbed values.
+  The `tool_call_start` event logs `args` — ensure args are scrubbed before
+  emission or redact the args field in the obs event.
+- **Avoid logging full HTTP request/response bodies** from provider calls
+  (`bc_provider_openrouter`, `bc_provider_openai`). Log only metadata: status
+  code, duration, model name, token count.
+
+### Code review checklist
+Before merging any PR, verify:
+- [ ] No hardcoded secrets in `*.erl`, `*.config`, `*.hrl`, or docs
+- [ ] `bc_scrubber:scrub/1` called on all new tool result paths
+- [ ] New API integrations have corresponding `bc_scrubber` patterns if keys
+      have a recognizable format
+- [ ] `{env, "VAR"}` used for any new config secret values
+- [ ] No new files that might contain real secrets (check with `git diff --name-only`)
 
 ## Technology Stack
 
