@@ -39,7 +39,7 @@
 start_link(Config) ->
     gen_statem:start_link(?MODULE, Config, []).
 
-callback_mode() -> state_functions.
+callback_mode() -> [state_functions, state_enter].
 
 init(Config) ->
     SessionId   = maps:get(session_id,   Config),

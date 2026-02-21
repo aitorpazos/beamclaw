@@ -93,7 +93,7 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_channel_telegram` | ✅ | long-poll / webhook; `send_response/2`; race fix |
 | `bc_channel_tui` | ✅ | stdin/stdout; `send_response/2`; race fix |
 
-### M7 — Testing & Hardening 🚧
+### M7 — Testing & Hardening ✅
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -104,7 +104,7 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | EUnit tests for `bc_rate_limiter` | ✅ | 4 tests; allow/within-limit/exceed/client-isolation |
 | Dialyzer clean | ✅ | 25 → 0 warnings; 3 targeted -dialyzer suppressions for runtime patterns |
 | `rebar3 lint` clean | ✅ | elvis.config; 6 rules disabled for intentional patterns; code fixes |
-| End-to-end smoke test (TUI channel) | ⬜ | |
+| End-to-end smoke test (TUI channel) | ✅ | 1 test; bc_provider_smoke_mock + bc_smoke_tests; also fixed bc_loop callback_mode bug |
 
 ### M8 — Release ⬜
 
@@ -125,4 +125,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M7 partial: 46 EUnit tests, Dialyzer clean, lint clean; smoke test remains)
+2026-02-21 (M7 complete: 47 EUnit tests, Dialyzer clean, lint clean, smoke test passing)
