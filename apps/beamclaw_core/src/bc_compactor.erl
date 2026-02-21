@@ -3,9 +3,10 @@
 %% Triggered in the 'compacting' gen_statem state when history exceeds threshold.
 %% Algorithm:
 %%   1. Keep last N messages verbatim (compaction_target, default 20)
-%%   2. Summarize older messages via LLM
+%%   2. Summarize older messages via LLM synchronous complete/3
 %%   3. Summary becomes a system message: "[Conversation summary]: ..."
 %%   4. Fallback on LLM failure: deterministic trim to last N messages
+%%   5. Write new history back to bc_session via set_history/2
 -module(bc_compactor).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
@@ -14,7 +15,7 @@
 
 -define(SUMMARY_PREFIX, <<"[Conversation summary]: ">>).
 
-%% @doc Compact the history in bc_session identified by SessionPid.
+%% @doc Compact the history held in SessionPid. Writes the result back.
 -spec compact(SessionPid :: pid()) -> ok.
 compact(SessionPid) ->
     History = bc_session:get_history(SessionPid),
@@ -39,7 +40,7 @@ compact(SessionPid) ->
                     KeepMsgs
             end,
             After = length(NewHistory),
-            %% Replace history in session (TODO: add bc_session:set_history/2)
+            bc_session:set_history(SessionPid, NewHistory),
             bc_obs:emit(compaction_complete,
                         #{before => Before, 'after' => After}),
             ok
@@ -61,8 +62,7 @@ summarize(Messages) ->
         content = ConvText,
         ts      = erlang:system_time(millisecond)
     },
-    %% Use default provider for summarization
-    ProvMod = bc_config:get(beamclaw_core, default_provider, openrouter),
+    ProvMod    = bc_config:get(beamclaw_core, default_provider, openrouter),
     ProvConfig = get_provider_config(ProvMod),
     case ProvMod:init(ProvConfig) of
         {ok, ProvState} ->
@@ -89,7 +89,8 @@ get_provider_config(ProvMod) ->
         _                      -> openrouter
     end,
     Providers = bc_config:get(beamclaw_core, providers, []),
-    proplists:get_value(ProviderKey, Providers, #{}).
+    ProvMap = proplists:get_value(ProviderKey, Providers, #{}),
+    bc_config:resolve(ProvMap).
 
 generate_id() ->
     <<N:64>> = crypto:strong_rand_bytes(8),

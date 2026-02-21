@@ -62,22 +62,22 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_mcp_registry` | ✅ | tool-name → server routing, PID monitors for auto-cleanup |
 | `bc_mcp_servers_sup` | ✅ | simple_one_for_one, servers started from app callback |
 
-### M5 — Core Agentic Loop ⬜
+### M5 — Core Agentic Loop ✅
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| `bc_config` | ⬜ | `{env, "VAR"}` resolution |
-| `bc_scrubber` | ⬜ | credential redaction |
-| `bc_tool_parser` | ⬜ | OpenAI → XML → Markdown → empty fallback chain |
-| `bc_compactor` | ⬜ | context compaction via LLM |
-| `bc_approval` | ⬜ | human-in-the-loop approval gen_server |
-| `bc_session_registry` | ⬜ | named ETS: session_id → pid |
-| `bc_session` | ⬜ | permanent gen_server, session lane |
-| `bc_loop` | ⬜ | gen_statem agentic loop |
-| `bc_provider` | ⬜ | behaviour |
-| `bc_provider_openrouter` | ⬜ | OpenRouter provider |
-| `bc_provider_openai` | ⬜ | OpenAI provider |
-| `bc_channel` | ⬜ | behaviour |
+| `bc_config` | ✅ | `{env, "VAR"}` resolution |
+| `bc_scrubber` | ✅ | credential redaction |
+| `bc_tool_parser` | ✅ | OpenAI → XML → Markdown → empty fallback chain |
+| `bc_compactor` | ✅ | context compaction via LLM; writes back via `bc_session:set_history/2` |
+| `bc_approval` | ✅ | approval gen_server; channel wiring deferred to M6 |
+| `bc_session_registry` | ✅ | named ETS: session_id → pid, with monitors |
+| `bc_session` | ✅ | permanent gen_server; loop_busy flag; queue drains on set_loop_pid |
+| `bc_loop` | ✅ | gen_statem; looks up session from registry; provider state threaded |
+| `bc_provider` | ✅ | behaviour |
+| `bc_provider_openrouter` | ✅ | OpenRouter provider (functional API) |
+| `bc_provider_openai` | ✅ | OpenAI provider (delegates to openrouter) |
+| `bc_channel` | ✅ | behaviour |
 
 ### M6 — Gateway ⬜
 
@@ -125,4 +125,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M4 complete: MCP client, fixed 4 bugs in scaffolding)
+2026-02-21 (M5 complete: core agentic loop, fixed 5 bugs in scaffolding)

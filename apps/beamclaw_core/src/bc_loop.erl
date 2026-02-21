@@ -6,6 +6,9 @@
 %%
 %% bc_loop is transient. A crash is restarted by bc_session_sup.
 %% bc_session (permanent) retains history across restarts.
+%%
+%% On init, bc_loop looks up its bc_session by session_id from bc_session_registry
+%% (bc_session registers itself before bc_loop starts, per supervisor child order).
 -module(bc_loop).
 -behaviour(gen_statem).
 
@@ -17,13 +20,15 @@
          awaiting_approval/3, executing_tools/3, finalizing/3]).
 
 -record(loop_data, {
-    session_pid  :: pid(),
-    session_id   :: binary(),
-    provider_mod :: module(),
-    config       :: map(),
-    current_run  :: term() | undefined,
-    tool_calls   :: [#bc_tool_call{}],
-    iteration    :: non_neg_integer()
+    session_pid    :: pid(),
+    session_id     :: binary(),
+    user_id        :: binary(),
+    provider_mod   :: module(),
+    provider_state :: term(),
+    config         :: map(),
+    current_run    :: term() | undefined,
+    tool_calls     :: [#bc_tool_call{}],
+    iteration      :: non_neg_integer()
 }).
 
 start_link(Config) ->
@@ -32,39 +37,45 @@ start_link(Config) ->
 callback_mode() -> state_functions.
 
 init(Config) ->
-    SessionPid  = maps:get(session_pid,  Config),
     SessionId   = maps:get(session_id,   Config),
     ProviderMod = maps:get(provider_mod, Config, bc_provider_openrouter),
+    %% bc_session registers in bc_session_registry during its own init/1.
+    %% The supervisor starts bc_session before bc_loop, so the lookup always succeeds.
+    {ok, SessionPid} = bc_session_registry:lookup(SessionId),
+    %% Initialise the provider — get credentials and build initial state.
+    ProvConfig = get_provider_config(ProviderMod),
+    {ok, ProvState} = ProviderMod:init(ProvConfig),
+    %% Tell bc_session our PID so it can dispatch runs to us.
     bc_session:set_loop_pid(SessionPid, self()),
     bc_obs:emit(agent_start, #{session_id => SessionId}),
     Data = #loop_data{
-        session_pid  = SessionPid,
-        session_id   = SessionId,
-        provider_mod = ProviderMod,
-        config       = Config,
-        current_run  = undefined,
-        tool_calls   = [],
-        iteration    = 0
+        session_pid    = SessionPid,
+        session_id     = SessionId,
+        user_id        = maps:get(user_id, Config, <<"anonymous">>),
+        provider_mod   = ProviderMod,
+        provider_state = ProvState,
+        config         = Config,
+        current_run    = undefined,
+        tool_calls     = [],
+        iteration      = 0
     },
     {ok, idle, Data}.
 
 %% ---- States ----
 
 idle(cast, {run, Message}, Data) ->
-    History  = bc_session:get_history(Data#loop_data.session_pid),
-    Threshold = maps:get(compaction_threshold,
-                    bc_config:get(beamclaw_core, agentic_loop, #{}), 50),
+    History   = bc_session:get_history(Data#loop_data.session_pid),
+    LoopCfg   = bc_config:get(beamclaw_core, agentic_loop, #{}),
+    Threshold = maps:get(compaction_threshold, LoopCfg, 50),
     NextState = case length(History) > Threshold of
         true  -> compacting;
         false -> streaming
     end,
-    bc_obs:emit(agent_start, #{session_id => Data#loop_data.session_id}),
     {next_state, NextState, Data#loop_data{current_run = Message, iteration = 0}};
 idle(EventType, EventContent, Data) ->
     handle_common(idle, EventType, EventContent, Data).
 
 compacting(enter, _OldState, Data) ->
-    %% Trigger compaction asynchronously via cast to self
     gen_statem:cast(self(), do_compact),
     {keep_state, Data};
 compacting(cast, do_compact, Data) ->
@@ -77,27 +88,26 @@ streaming(enter, _OldState, Data) ->
     gen_statem:cast(self(), do_stream),
     {keep_state, Data};
 streaming(cast, do_stream, Data) ->
-    History     = bc_session:get_history(Data#loop_data.session_pid),
-    SessionRef  = make_session_ref(Data),
-    LoopCfg     = bc_config:get(beamclaw_core, agentic_loop, #{}),
-    ChunkSize   = maps:get(stream_chunk_size, LoopCfg, 80),
+    History   = bc_session:get_history(Data#loop_data.session_pid),
+    LoopCfg   = bc_config:get(beamclaw_core, agentic_loop, #{}),
+    ChunkSize = maps:get(stream_chunk_size, LoopCfg, 80),
     T0 = erlang:monotonic_time(millisecond),
-    bc_obs:emit(llm_request, #{session_id => Data#loop_data.session_id,
+    bc_obs:emit(llm_request, #{session_id    => Data#loop_data.session_id,
                                 message_count => length(History)}),
-    case (Data#loop_data.provider_mod):stream(History, #{chunk_size => ChunkSize},
-                                              self(), SessionRef) of
-        {ok, _ProvState} ->
-            receive_stream(Data, T0);
-        {error, Reason, _ProvState} ->
+    ProvMod   = Data#loop_data.provider_mod,
+    ProvState = Data#loop_data.provider_state,
+    case ProvMod:stream(History, #{chunk_size => ChunkSize}, self(), ProvState) of
+        {ok, NewProvState} ->
+            receive_stream(Data#loop_data{provider_state = NewProvState}, T0);
+        {error, Reason, NewProvState} ->
             bc_obs:emit(llm_response, #{session_id => Data#loop_data.session_id,
                                         success => false, error => Reason}),
-            {next_state, finalizing, Data}
+            {next_state, finalizing, Data#loop_data{provider_state = NewProvState}}
     end;
 streaming(EventType, EventContent, Data) ->
     handle_common(streaming, EventType, EventContent, Data).
 
 awaiting_approval(enter, _OldState, Data) ->
-    %% bc_approval sends {approval_result, ToolCallId, Decision} back
     {keep_state, Data};
 awaiting_approval(info, {approval_result, _ToolCallId, approved}, Data) ->
     {next_state, executing_tools, Data};
@@ -110,8 +120,8 @@ executing_tools(enter, _OldState, Data) ->
     gen_statem:cast(self(), do_execute),
     {keep_state, Data};
 executing_tools(cast, do_execute, Data) ->
-    MaxIter = maps:get(max_tool_iterations,
-                  bc_config:get(beamclaw_core, agentic_loop, #{}), 10),
+    LoopCfg = bc_config:get(beamclaw_core, agentic_loop, #{}),
+    MaxIter = maps:get(max_tool_iterations, LoopCfg, 10),
     case Data#loop_data.iteration >= MaxIter of
         true ->
             logger:warning("[loop] max tool iterations (~p) reached", [MaxIter]),
@@ -141,7 +151,7 @@ code_change(_OldVsn, State, Data, _Extra) ->
 %% ---- Internal ----
 
 handle_common(_State, cast, {run, Message}, Data) ->
-    %% Enqueue to session while we're busy; bc_session handles the queue
+    %% A new run arrived while we are busy; forward to bc_session for queueing.
     bc_session:dispatch_run(Data#loop_data.session_pid, Message),
     keep_state_and_data;
 handle_common(_State, _Type, _Content, _Data) ->
@@ -150,19 +160,19 @@ handle_common(_State, _Type, _Content, _Data) ->
 make_session_ref(Data) ->
     #bc_session_ref{
         session_id  = Data#loop_data.session_id,
-        user_id     = <<"">>,
+        user_id     = Data#loop_data.user_id,
         session_pid = Data#loop_data.session_pid,
-        autonomy    = supervised
+        autonomy    = supervised  %% TODO: pull from bc_session config in M6
     }.
 
 receive_stream(Data, T0) ->
     receive
         {stream_chunk, _Pid, _Chunk} ->
-            %% TODO: forward chunk to channel via bc_channel:update_draft
+            %% TODO: forward chunk to channel via bc_channel:update_draft (M6)
             receive_stream(Data, T0);
         {stream_done, _Pid, FullMsg} ->
             Duration = erlang:monotonic_time(millisecond) - T0,
-            bc_obs:emit(llm_response, #{session_id => Data#loop_data.session_id,
+            bc_obs:emit(llm_response, #{session_id  => Data#loop_data.session_id,
                                         duration_ms => Duration, success => true}),
             ScrubbedMsg = bc_scrubber:scrub_message(FullMsg),
             bc_session:append_message(Data#loop_data.session_pid, ScrubbedMsg),
@@ -193,12 +203,13 @@ maybe_await_approval(#loop_data{tool_calls = Calls} = Data) ->
     end.
 
 execute_tool_calls(Data) ->
+    SessionRef = make_session_ref(Data),
     Results = lists:map(fun(TC) ->
         bc_obs:emit(tool_call_start, #{tool_name  => TC#bc_tool_call.name,
                                        args       => TC#bc_tool_call.args,
                                        session_id => Data#loop_data.session_id}),
         T0 = erlang:monotonic_time(millisecond),
-        Result = run_tool(TC, Data),
+        Result = run_tool(TC, SessionRef),
         Duration = erlang:monotonic_time(millisecond) - T0,
         bc_obs:emit(tool_call_result, #{tool_name  => TC#bc_tool_call.name,
                                         duration_ms => Duration,
@@ -211,24 +222,20 @@ execute_tool_calls(Data) ->
             is_error     = element(1, Result) =:= error
         }
     end, Data#loop_data.tool_calls),
-    %% Scrub credentials from tool results before appending to history
+    %% Scrub credentials before appending to history.
     Scrubbed = [bc_scrubber:scrub_result(R) || R <- Results],
     ToolMsgs = [result_to_message(R) || R <- Scrubbed],
-    lists:foreach(fun(M) -> bc_session:append_message(Data#loop_data.session_pid, M) end,
-                  ToolMsgs),
-    NewData = Data#loop_data{
-        tool_calls = [],
-        iteration  = Data#loop_data.iteration + 1
-    },
+    lists:foreach(fun(M) ->
+        bc_session:append_message(Data#loop_data.session_pid, M)
+    end, ToolMsgs),
+    NewData = Data#loop_data{tool_calls = [], iteration = Data#loop_data.iteration + 1},
     {next_state, streaming, NewData}.
 
-run_tool(#bc_tool_call{name = Name, args = Args}, Data) ->
-    SessionRef = make_session_ref(Data),
+run_tool(#bc_tool_call{name = Name, args = Args}, SessionRef) ->
     case bc_tool_registry:lookup(Name) of
         {ok, {Mod, _Def}} ->
             Mod:execute(Args, SessionRef, #{});
         {error, not_found} ->
-            %% Try MCP
             case bc_mcp_registry:lookup(Name) of
                 {ok, {ServerPid, _}} ->
                     bc_mcp_server:call_tool(ServerPid, Name, Args);
@@ -248,6 +255,16 @@ result_to_message(#bc_tool_result{tool_call_id = Id, name = Name,
         ts           = erlang:system_time(millisecond),
         tool_calls   = [{is_error, IsErr}]
     }.
+
+get_provider_config(ProviderMod) ->
+    ProviderKey = case ProviderMod of
+        bc_provider_openrouter -> openrouter;
+        bc_provider_openai     -> openai;
+        _                      -> openrouter
+    end,
+    Providers = bc_config:get(beamclaw_core, providers, []),
+    ProvMap = proplists:get_value(ProviderKey, Providers, #{}),
+    bc_config:resolve(ProvMap).
 
 generate_id() ->
     <<N:128>> = crypto:strong_rand_bytes(16),

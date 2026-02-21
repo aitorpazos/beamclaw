@@ -4,7 +4,9 @@
 %% pending_runs queue. When the loop is busy, incoming runs are enqueued.
 %% When the loop completes (turn_complete), the next run is dispatched.
 %%
-%% History survives loop crashes because bc_session is permanent and bc_loop is transient.
+%% History survives loop crashes because bc_session is permanent and bc_loop
+%% is transient. On bc_loop restart, bc_loop:init/1 looks up this process via
+%% bc_session_registry, fetches history, and announces its new PID here.
 -module(bc_session).
 -behaviour(gen_server).
 
@@ -13,6 +15,7 @@
 -export([start_link/1,
          dispatch_run/2,
          get_history/1,
+         set_history/2,
          append_message/2,
          set_loop_pid/2,
          turn_complete/2]).
@@ -26,6 +29,7 @@
     channel_id    :: binary(),
     autonomy      :: autonomy_level(),
     loop_pid      :: pid() | undefined,
+    loop_busy     :: boolean(),          %% true while a run is in progress
     provider_mod  :: module(),
     memory_mod    :: module(),
     history       :: [#bc_message{}],
@@ -46,12 +50,18 @@ dispatch_run(Pid, Message) ->
 get_history(Pid) ->
     gen_server:call(Pid, get_history).
 
-%% @doc Append a message to history (called by bc_loop).
+%% @doc Replace the full conversation history (called by bc_compactor).
+-spec set_history(Pid :: pid(), History :: [#bc_message{}]) -> ok.
+set_history(Pid, History) ->
+    gen_server:cast(Pid, {set_history, History}).
+
+%% @doc Append a single message to history (called by bc_loop).
 -spec append_message(Pid :: pid(), Message :: #bc_message{}) -> ok.
 append_message(Pid, Message) ->
     gen_server:cast(Pid, {append_message, Message}).
 
-%% @doc Update the loop pid reference.
+%% @doc Update the loop pid reference. Called by bc_loop:init/1.
+%% Drains the pending_runs queue if messages arrived before the loop started.
 -spec set_loop_pid(Pid :: pid(), LoopPid :: pid()) -> ok.
 set_loop_pid(Pid, LoopPid) ->
     gen_server:cast(Pid, {set_loop_pid, LoopPid}).
@@ -72,6 +82,7 @@ init(Config) ->
         autonomy     = maps:get(autonomy,      Config,
                            bc_config:get(beamclaw_core, autonomy_level, supervised)),
         loop_pid     = undefined,
+        loop_busy    = false,
         provider_mod = maps:get(provider_mod, Config, bc_provider_openrouter),
         memory_mod   = maps:get(memory_mod,   Config, bc_memory_ets),
         history      = [],
@@ -80,28 +91,47 @@ init(Config) ->
     },
     {ok, State}.
 
+%% Loop not yet started (startup race) — enqueue for safety.
 handle_cast({dispatch_run, Message}, #state{loop_pid = undefined} = State) ->
-    %% Loop is idle — dispatch immediately
-    send_to_loop(Message, State),
-    {noreply, State};
-handle_cast({dispatch_run, Message}, State) ->
-    %% Loop is busy — enqueue
     NewQueue = queue:in(Message, State#state.pending_runs),
     {noreply, State#state{pending_runs = NewQueue}};
+
+%% Loop idle — dispatch directly and mark busy.
+handle_cast({dispatch_run, Message}, #state{loop_busy = false} = State) ->
+    gen_statem:cast(State#state.loop_pid, {run, Message}),
+    {noreply, State#state{loop_busy = true}};
+
+%% Loop busy — enqueue.
+handle_cast({dispatch_run, Message}, State) ->
+    NewQueue = queue:in(Message, State#state.pending_runs),
+    {noreply, State#state{pending_runs = NewQueue}};
+
+%% Loop announced its PID — drain any queued messages that arrived during startup.
+handle_cast({set_loop_pid, Pid}, State) ->
+    NewState = State#state{loop_pid = Pid},
+    case queue:out(NewState#state.pending_runs) of
+        {{value, Msg}, Rest} ->
+            gen_statem:cast(Pid, {run, Msg}),
+            {noreply, NewState#state{pending_runs = Rest, loop_busy = true}};
+        {empty, _} ->
+            {noreply, NewState#state{loop_busy = false}}
+    end;
+
+handle_cast({set_history, NewHistory}, State) ->
+    {noreply, State#state{history = NewHistory}};
 
 handle_cast({append_message, Msg}, State) ->
     {noreply, State#state{history = State#state.history ++ [Msg]}};
 
-handle_cast({set_loop_pid, Pid}, State) ->
-    {noreply, State#state{loop_pid = Pid}};
-
 handle_cast({turn_complete, _Result}, State) ->
     case queue:out(State#state.pending_runs) of
         {{value, NextMsg}, Rest} ->
-            send_to_loop(NextMsg, State),
+            %% Keep loop_pid; dispatch next queued run. Loop stays busy.
+            gen_statem:cast(State#state.loop_pid, {run, NextMsg}),
             {noreply, State#state{pending_runs = Rest}};
         {empty, _} ->
-            {noreply, State#state{loop_pid = undefined}}
+            %% No pending runs — loop becomes idle (pid retained for next run).
+            {noreply, State#state{loop_busy = false}}
     end;
 
 handle_cast(_Msg, State) ->
@@ -124,11 +154,6 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 %% Internal
-
-send_to_loop(Message, #state{loop_pid = Pid}) when is_pid(Pid) ->
-    gen_statem:cast(Pid, {run, Message});
-send_to_loop(_Message, _State) ->
-    ok. %% Loop not started yet; will be dispatched on loop init
 
 generate_id() ->
     <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
