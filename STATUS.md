@@ -33,13 +33,13 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_obs_manager` | ✅ | fan-out via `pg` process groups |
 | `bc_obs_log` | ✅ | OTP logger backend |
 
-### M2 — Memory Layer ⬜
+### M2 — Memory Layer ✅
 
 | Module | Status | Notes |
 |--------|--------|-------|
 | `bc_memory` | ✅ | behaviour |
-| `bc_memory_ets` | ✅ | in-process ETS backend |
-| `bc_memory_sqlite` | ⬜ | persistent SQLite backend |
+| `bc_memory_ets` | ✅ | in-process ETS backend (default) |
+| `bc_memory_mnesia` | ✅ | Mnesia backend (disc_copies / ram_copies fallback); replaces SQLite stub (ADR-010) |
 
 ### M3 — Tool Registry ⬜
 
@@ -123,4 +123,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-20
+2026-02-21

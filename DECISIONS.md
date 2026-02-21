@@ -327,3 +327,56 @@ adding it as a supervisor child — no changes to `bc_obs_manager` or callers.
   a stub until a backend is added.
 - A future ADR should document the chosen metrics approach when production
   needs arise (prometheus.erl, telemetry, or otherwise).
+
+---
+
+## ADR-010 — Replace bc_memory_sqlite stub with bc_memory_mnesia
+
+**Date**: 2026-02-21
+**Status**: Accepted
+
+### Context
+
+`bc_memory_sqlite` was a stub (every callback returned `not_implemented`).
+The planned SQLite backend would require a NIF or port driver (e.g. esqlite),
+adding an external dependency and C-compilation risk. For the BeamClaw memory
+use case, the schema is stable (five fixed fields, no migrations expected), the
+data volume is small (single-user workloads), and Mnesia is already available
+as part of OTP.
+
+### Decision
+
+Delete `bc_memory_sqlite.erl` and implement `bc_memory_mnesia.erl` as the
+persistent memory backend. One global Mnesia table `bc_memory_entries` uses a
+composite `{SessionId, UserKey}` primary key to provide per-session isolation
+without dynamic table creation or per-session atom leakage.
+
+Storage type is `disc_copies` when a disc schema exists (production), falling
+back to `ram_copies` when no schema is on disk (dev/test shell). The
+`beamclaw_memory_app` handles schema and table creation on application start,
+guarding against `already_exists` on subsequent restarts.
+
+The ETS backend remains the default (`{backend, ets}` in `sys.config`) for
+ephemeral conversation memory. The Mnesia backend is opt-in for sessions
+requiring persistence across restarts.
+
+### Rationale
+
+- Zero extra dependencies: Mnesia ships with OTP.
+- Transactional semantics protect against partial-write corruption if `bc_loop`
+  crashes mid-store (dirty writes are used today; upgrading to transactions
+  requires no API changes).
+- Single composite-key table is simpler than one table per session; avoids
+  dynamic schema changes and atom-per-session naming.
+- `bc_memory_sqlite` was a stub — no migration of existing data is needed.
+
+### Consequences
+
+- Mnesia disc_copies requires a disc schema to be created before the first
+  `mnesia:start/0`. In production this is a one-time `mnesia:create_schema/1`
+  call (release hook or setup script). In dev/test the backend silently uses
+  `ram_copies`, which is acceptable.
+- The 2 GB Mnesia disc_copies limit per table is not a constraint for
+  single-user agent memory workloads.
+- If a distributed (multi-node) deployment is later required, Mnesia's built-in
+  replication can be configured without changing the `bc_memory` behaviour API.

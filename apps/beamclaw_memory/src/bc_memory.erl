@@ -1,7 +1,7 @@
 %% @doc Memory behaviour definition.
 %%
 %% All memory backends must implement these callbacks.
-%% See bc_memory_ets and bc_memory_sqlite for reference implementations.
+%% See bc_memory_ets and bc_memory_mnesia for reference implementations.
 -module(bc_memory).
 
 -type memory_category() :: core | daily | conversation | custom.
