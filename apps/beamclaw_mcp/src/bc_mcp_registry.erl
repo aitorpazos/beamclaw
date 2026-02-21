@@ -1,6 +1,9 @@
 %% @doc MCP tool registry — maps tool_name → {server_pid, server_name}.
 %%
-%% When a bc_mcp_server discovers tools via tools/list, it registers them here.
+%% When a bc_mcp_server discovers tools via tools/list, it calls
+%% register_tools/3 here. Each server PID is monitored; when the process
+%% dies (e.g. port crash before restart), its ETS entries are cleaned up
+%% automatically so stale tool→pid mappings do not accumulate.
 -module(bc_mcp_registry).
 -behaviour(gen_server).
 
@@ -30,25 +33,44 @@ lookup(ToolName) ->
 unregister_server(ServerPid) ->
     gen_server:cast(?MODULE, {unregister, ServerPid}).
 
+%% State: #{monitors => #{pid() => reference()}}
 init([]) ->
     ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
-    {ok, #{}}.
+    {ok, #{monitors => #{}}}.
 
-handle_cast({register, Pid, Name, Tools}, State) ->
+handle_cast({register, Pid, Name, Tools}, #{monitors := Mons} = State) ->
+    %% Monitor if not already monitored (handles re-registration after restart
+    %% with new PID; old PID's DOWN already cleaned its entries).
+    NewMons = case maps:is_key(Pid, Mons) of
+        true  -> Mons;
+        false ->
+            Ref = erlang:monitor(process, Pid),
+            Mons#{Pid => Ref}
+    end,
     lists:foreach(fun(Tool) ->
-        ToolName = maps:get(name, Tool, maps:get(<<"name">>, Tool, <<>>)),
+        ToolName = maps:get(<<"name">>, Tool, maps:get(name, Tool, <<>>)),
         ets:insert(?TAB, {ToolName, Pid, Name})
     end, Tools),
-    {noreply, State};
-handle_cast({unregister, Pid}, State) ->
+    {noreply, State#{monitors := NewMons}};
+handle_cast({unregister, Pid}, #{monitors := Mons} = State) ->
     ets:match_delete(?TAB, {'_', Pid, '_'}),
-    {noreply, State};
+    NewMons = case maps:get(Pid, Mons, undefined) of
+        undefined -> Mons;
+        Ref ->
+            erlang:demonitor(Ref, [flush]),
+            maps:remove(Pid, Mons)
+    end,
+    {noreply, State#{monitors := NewMons}};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_call(_Req, _From, State) ->
     {reply, {error, unknown}, State}.
 
+handle_info({'DOWN', _Ref, process, Pid, _Reason}, #{monitors := Mons} = State) ->
+    %% Server process died — remove all its tool entries from ETS.
+    ets:match_delete(?TAB, {'_', Pid, '_'}),
+    {noreply, State#{monitors := maps:remove(Pid, Mons)}};
 handle_info(_Info, State) ->
     {noreply, State}.
 

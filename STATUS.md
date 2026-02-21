@@ -54,13 +54,13 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_tool_read_file` | ✅ | new: read-only file read, no approval |
 | `bc_tool_write_file` | ✅ | new: file write, requires approval |
 
-### M4 — MCP Client ⬜
+### M4 — MCP Client ✅
 
 | Module | Status | Notes |
 |--------|--------|-------|
-| `bc_mcp_server` | ⬜ | stdio/HTTP transport, JSON-RPC 2.0 |
-| `bc_mcp_registry` | ⬜ | tool-name → server routing |
-| `bc_mcp_servers_sup` | ⬜ | dynamic one_for_one supervisor |
+| `bc_mcp_server` | ✅ | stdio transport, JSON-RPC 2.0, state threading fixed |
+| `bc_mcp_registry` | ✅ | tool-name → server routing, PID monitors for auto-cleanup |
+| `bc_mcp_servers_sup` | ✅ | simple_one_for_one, servers started from app callback |
 
 ### M5 — Core Agentic Loop ⬜
 
@@ -125,4 +125,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M3 refresh: mark existing items ✅, add read_file/write_file tools)
+2026-02-21 (M4 complete: MCP client, fixed 4 bugs in scaffolding)

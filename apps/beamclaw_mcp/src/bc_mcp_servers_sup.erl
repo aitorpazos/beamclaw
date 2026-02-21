@@ -1,7 +1,11 @@
 %% @doc Dynamic supervisor for MCP server connections.
 %%
 %% Starts one bc_mcp_server per configured MCP server.
-%% Supervisor strategy: one_for_one with MaxR=5, MaxT=30 for exponential-backoff-like behaviour.
+%% Supervisor strategy: simple_one_for_one so children are started via
+%% start_server/1. Configured servers are started from beamclaw_mcp_app
+%% after this supervisor is running.
+%%
+%% MaxR=5, MaxT=30 gives exponential-backoff-like restart limiting.
 -module(bc_mcp_servers_sup).
 -behaviour(supervisor).
 
@@ -24,6 +28,4 @@ init([]) ->
                   shutdown => 5000,
                   type     => worker,
                   modules  => [bc_mcp_server]},
-    %% Start configured servers
-    Servers = application:get_env(beamclaw_mcp, servers, []),
-    {ok, {SupFlags, [ChildSpec]}, Servers}.
+    {ok, {SupFlags, [ChildSpec]}}.
