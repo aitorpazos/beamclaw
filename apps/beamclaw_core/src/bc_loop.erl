@@ -125,6 +125,10 @@ streaming(cast, do_stream, Data) ->
         {error, Reason, NewProvState} ->
             bc_obs:emit(llm_response, #{session_id => Data#loop_data.session_id,
                                         success => false, error => Reason}),
+            ErrContent = iolist_to_binary(io_lib:format("[Error: ~p]", [Reason])),
+            route_response(Data, #bc_message{role    = assistant,
+                                             content = ErrContent,
+                                             ts      = erlang:system_time(millisecond)}),
             {next_state, finalizing, Data#loop_data{provider_state = NewProvState}}
     end;
 streaming(EventType, EventContent, Data) ->
@@ -324,7 +328,16 @@ get_provider_config(ProviderMod) ->
     end,
     Providers = bc_config:get(beamclaw_core, providers, []),
     ProvMap = proplists:get_value(ProviderKey, Providers, #{}),
-    bc_config:resolve(ProvMap).
+    try bc_config:resolve(ProvMap)
+    catch error:{missing_env_var, Var} ->
+        logger:warning("[bc_loop] env var ~s not set; "
+                       "provider calls will fail with auth error", [Var]),
+        %% Substitute empty string so init/1 succeeds. The HTTP call will
+        %% return 401, which stream/4 sends as {stream_error,...}; that is
+        %% already routed to the user (receive_stream/2) and now also via
+        %% the {error, Reason, NewProvState} arm above.
+        maps:map(fun(_, {env, _}) -> ""; (_, V) -> V end, ProvMap)
+    end.
 
 generate_id() ->
     <<N:128>> = crypto:strong_rand_bytes(16),
