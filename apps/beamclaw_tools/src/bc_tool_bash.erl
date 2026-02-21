@@ -21,7 +21,7 @@ execute(#{<<"script">> := Script}, _Session, _Context) ->
     TmpFile = "/tmp/bc_bash_" ++ integer_to_list(erlang:unique_integer([positive])),
     ok = file:write_file(TmpFile, Script),
     Output = os:cmd("bash " ++ TmpFile ++ " 2>&1"),
-    file:delete(TmpFile),
+    _ = file:delete(TmpFile),
     {ok, iolist_to_binary(Output)}.
 
 requires_approval() -> true.

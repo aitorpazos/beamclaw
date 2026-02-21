@@ -36,7 +36,7 @@ all() ->
     ets:tab2list(?TAB).
 
 init([]) ->
-    ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
+    _ = ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
     {ok, #{}}.
 
 handle_call({register, SessionId, Pid}, _From, State) ->

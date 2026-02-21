@@ -43,17 +43,17 @@ listen(State) ->
 
 send(SessionId, #bc_message{content = Content}, State) ->
     ChatId = resolve_chat_id(SessionId, State),
-    send_message(ChatId, Content, State),
+    _ = send_message(ChatId, Content, State),
     {ok, State}.
 
 send_typing(SessionId, State) ->
     ChatId = resolve_chat_id(SessionId, State),
-    send_action(ChatId, <<"typing">>, State),
+    _ = send_action(ChatId, <<"typing">>, State),
     ok.
 
 update_draft(SessionId, DraftId, Content, State) ->
     ChatId = resolve_chat_id(SessionId, State),
-    edit_message(ChatId, DraftId, Content, State),
+    _ = edit_message(ChatId, DraftId, Content, State),
     {ok, State}.
 
 finalize_draft(_SessionId, _DraftId, State) ->

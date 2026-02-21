@@ -17,6 +17,11 @@
 
 -export([init/2, store/4, recall/4, get/2, forget/2]).
 
+%% Mnesia dirty_match_object uses record fields set to the atom '_' as wildcards.
+%% This is a Mnesia runtime convention that Dialyzer's type system cannot model,
+%% so we suppress the resulting spurious warnings for the affected functions.
+-dialyzer({nowarn_function, [recall/4, query_matches/2]}).
+
 %% ---------------------------------------------------------------------------
 %% bc_memory callbacks
 %% ---------------------------------------------------------------------------
@@ -47,7 +52,7 @@ store(Key, Value, Category, #{session_id := SessionId} = State) ->
     {ok, State}.
 
 recall(Query, Limit, Category, #{session_id := SessionId} = State) ->
-    CatWild = if Category =:= all -> '_'; true -> Category end,
+    CatWild = case Category of all -> '_'; _ -> Category end,
     Pattern = #bc_memory_entry_stored{
         key        = {SessionId, '_'},
         value      = '_',

@@ -35,7 +35,7 @@ unregister_server(ServerPid) ->
 
 %% State: #{monitors => #{pid() => reference()}}
 init([]) ->
-    ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
+    _ = ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
     {ok, #{monitors => #{}}}.
 
 handle_cast({register, Pid, Name, Tools}, #{monitors := Mons} = State) ->

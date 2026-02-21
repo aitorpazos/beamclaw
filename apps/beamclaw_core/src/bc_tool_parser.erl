@@ -15,15 +15,15 @@
 
 %% @doc Parse tool calls from a bc_message. Returns list of bc_tool_call records.
 -spec parse(#bc_message{}) -> [#bc_tool_call{}].
-parse(#bc_message{tool_calls = [_|_] = Calls}) ->
+parse(#bc_message{tool_calls = [_ | _] = Calls}) ->
     %% 1. Native OpenAI tool_calls
     [native_to_record(C) || C <- Calls];
 parse(#bc_message{content = Content}) when is_binary(Content) ->
     case parse_xml(Content) of
-        [_|_] = Results -> Results;
+        [_ | _] = Results -> Results;
         [] ->
             case parse_markdown(Content) of
-                [_|_] = Results -> Results;
+                [_ | _] = Results -> Results;
                 [] -> []
             end
     end;

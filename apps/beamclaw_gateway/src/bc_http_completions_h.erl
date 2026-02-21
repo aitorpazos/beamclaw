@@ -152,10 +152,8 @@ get_or_create_session(SessionId) ->
     end.
 
 peer_ip(Req) ->
-    case cowboy_req:peer(Req) of
-        {Ip, _Port} -> Ip;
-        _            -> unknown
-    end.
+    {Ip, _Port} = cowboy_req:peer(Req),
+    Ip.
 
 generate_session_id() ->
     <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),

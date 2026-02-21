@@ -37,7 +37,7 @@
     id     :: binary(),
     name   :: binary(),
     args   :: map(),
-    source :: builtin | mcp | binary()
+    source :: builtin | mcp | native | xml | markdown | binary()
 }).
 
 %% A tool execution result.

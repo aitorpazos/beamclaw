@@ -13,7 +13,8 @@ definition() ->
       parameters  => #{
           type       => object,
           properties => #{
-              path    => #{type => string, description => <<"Absolute or relative path to the file">>},
+              path    => #{type => string,
+                           description => <<"Absolute or relative path to the file">>},
               content => #{type => string, description => <<"Text content to write">>}
           },
           required   => [<<"path">>, <<"content">>]

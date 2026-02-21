@@ -19,6 +19,12 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+%% open_port/1 builds a command from a runtime Config map; Dialyzer cannot
+%% infer that maps:get/3 on an untyped map yields a valid string, so it
+%% conservatively concludes that erlang:open_port always raises and that
+%% handshake/1 is dead code.  These are false positives.
+-dialyzer({nowarn_function, [open_port/1, handle_info/2, handshake/1]}).
+
 -record(state, {
     config   :: map(),
     name     :: binary(),
@@ -100,13 +106,18 @@ code_change(_OldVsn, State, _Extra) ->
 open_port(Config) ->
     Cmd  = maps:get(command, Config, ""),
     Args = maps:get(args, Config, []),
-    FullCmd = string:join([Cmd | Args], " "),
-    try
-        Port = erlang:open_port({spawn, FullCmd},
-                                [binary, {packet, line}, exit_status]),
-        {ok, Port}
-    catch
-        _:Reason -> {error, Reason}
+    case Cmd of
+        "" ->
+            {error, no_command_configured};
+        _ ->
+            FullCmd = string:join([Cmd | Args], " "),
+            try
+                Port = erlang:open_port({spawn, FullCmd},
+                                        [binary, {packet, line}, exit_status]),
+                {ok, Port}
+            catch
+                _:Reason -> {error, Reason}
+            end
     end.
 
 handshake(State) ->

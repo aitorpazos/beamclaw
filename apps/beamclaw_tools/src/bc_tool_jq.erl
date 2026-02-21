@@ -22,7 +22,7 @@ execute(#{<<"filter">> := Filter, <<"input">> := Input}, _Session, _Context) ->
     ok = file:write_file(TmpIn, Input),
     Cmd = io_lib:format("jq ~p ~s 2>&1", [binary_to_list(Filter), TmpIn]),
     Output = os:cmd(lists:flatten(Cmd)),
-    file:delete(TmpIn),
+    _ = file:delete(TmpIn),
     {ok, iolist_to_binary(Output)}.
 
 requires_approval() -> false.

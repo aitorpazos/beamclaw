@@ -21,7 +21,7 @@
     autonomy     :: autonomy_level(),
     allowlist    :: sets:set(binary()),   %% tool names user approved "always"
     channel_mod  :: module(),
-    pending      :: {reference(), pid(), #bc_tool_call{}} | undefined
+    pending      :: {reference(), gen_server:from(), #bc_tool_call{}} | undefined
 }).
 
 start_link(Config) ->

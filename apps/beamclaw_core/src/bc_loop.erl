@@ -184,7 +184,7 @@ receive_stream(Data, T0) ->
         {stream_chunk, _Pid, Chunk} ->
             %% Forward to direct reply target (HTTP/WS); channel gen-servers
             %% don't need intermediate chunks.
-            case Data#loop_data.reply_pid of
+            _ = case Data#loop_data.reply_pid of
                 undefined -> ok;
                 RPid -> RPid ! {bc_chunk, Data#loop_data.session_id, Chunk}
             end,

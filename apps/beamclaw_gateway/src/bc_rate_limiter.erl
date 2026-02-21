@@ -34,7 +34,7 @@ check(ClientId, _Path) ->
     end.
 
 init([]) ->
-    ets:new(?TAB, [set, named_table, public, {write_concurrency, true}]),
+    _ = ets:new(?TAB, [set, named_table, public, {write_concurrency, true}]),
     erlang:send_after(?PRUNE_MS, self(), prune),
     {ok, #{}}.
 

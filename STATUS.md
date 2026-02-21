@@ -102,8 +102,8 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | EUnit tests for `bc_compactor` | ✅ | 3 tests; no-op paths (LLM path needs integration test) |
 | EUnit tests for `bc_approval` | ✅ | 5 tests; full/read_only/supervised/allowlist/unknown |
 | EUnit tests for `bc_rate_limiter` | ✅ | 4 tests; allow/within-limit/exceed/client-isolation |
-| Dialyzer clean | ⬜ | |
-| `rebar3 lint` clean | ⬜ | |
+| Dialyzer clean | ✅ | 25 → 0 warnings; 3 targeted -dialyzer suppressions for runtime patterns |
+| `rebar3 lint` clean | ✅ | elvis.config; 6 rules disabled for intentional patterns; code fixes |
 | End-to-end smoke test (TUI channel) | ⬜ | |
 
 ### M8 — Release ⬜
@@ -125,4 +125,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M7 partial: 46 EUnit tests passing across 5 modules; Dialyzer/lint/smoke test remain)
+2026-02-21 (M7 partial: 46 EUnit tests, Dialyzer clean, lint clean; smoke test remains)

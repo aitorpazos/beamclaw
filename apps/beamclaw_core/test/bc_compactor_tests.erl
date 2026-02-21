@@ -25,6 +25,8 @@ mock_session_loop(History) ->
             mock_session_loop(NewHistory);
         _ ->
             mock_session_loop(History)
+    after 5000 ->
+        ok
     end.
 
 make_msg(N) ->
