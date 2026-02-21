@@ -1,0 +1,7 @@
+{application, beamclaw_cli, [
+    {description, "BeamClaw CLI"},
+    {vsn, "0.1.0"},
+    {registered, []},
+    {applications, [kernel, stdlib, inets]},
+    {env, []}
+]}.

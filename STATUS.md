@@ -128,6 +128,25 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 |------|--------|-------|
 | `CONTRIBUTING.md` | ✅ | Welcome, dev workflow, coding standards, security rules, AI-assisted contribution guidelines |
 
+### M9 — `beamclaw` CLI (escript) ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `apps/beamclaw_cli/src/beamclaw_cli.app.src` | ✅ | Minimal app descriptor; no callback/supervisor |
+| `apps/beamclaw_cli/src/beamclaw.erl` | ✅ | escript main; all 9 commands implemented |
+| `rebar3 escriptize` config in `rebar.config` | ✅ | `escript_main_app`, `escript_name`, `escript_incl_apps` |
+| ADR-012 (fat escript) | ✅ | Documents CLI approach and rationale |
+| ADR-013 (daemon via Erlang distribution) | ✅ | Documents IPC pattern (nodetool) |
+| `beamclaw tui` | ✅ | Embedded config; exclusive stdin; monitor TUI pid; blocks until EOF |
+| `beamclaw start` | ✅ | Spawns detached erl daemon; polls net_adm:ping for confirmation |
+| `beamclaw stop` | ✅ | RPC `init:stop/0`; polls until node gone |
+| `beamclaw restart` | ✅ | stop + start |
+| `beamclaw remote_console` | ✅ | Prints `erl -remsh beamclaw@localhost` command |
+| `beamclaw doctor` | ✅ | 5 local checks + optional OpenRouter network check |
+| `beamclaw status` | ✅ | HTTP GET /health via httpc |
+| `beamclaw version` | ✅ | Prints version string |
+| `beamclaw help` | ✅ | Usage summary |
+
 ---
 
 ## Known Issues / Blockers
@@ -138,4 +157,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (Post-M8: CONTRIBUTING.md created with agentic contributor guidelines)
+2026-02-21 (M9: beamclaw CLI escript implemented)

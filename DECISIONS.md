@@ -434,3 +434,95 @@ to depend on `beamclaw_memory`, creating a cycle with `beamclaw_core`.
 - File writes still require approval (consistent with `bash` and `terminal`).
 - `beamclaw_tools` now lists six built-in tools.
 - `inets` is started as part of the `beamclaw_tools` application boot sequence.
+
+---
+
+## ADR-012 — `beamclaw` CLI implemented as a fat escript
+
+**Date**: 2026-02-21
+**Status**: Accepted
+
+### Context
+
+BeamClaw had no CLI entry point. Users were required to know the internal
+`erl -noshell ...` invocation or `rebar3 shell` (which starts an Erlang REPL
+competing with stdin) to run the TUI or gateway. This created a poor developer
+experience and raised the barrier to first-run success.
+
+### Decision
+
+Implement a `beamclaw` CLI as a rebar3 escript (`rebar3 escriptize`), bundling
+all six app beams into a single self-contained executable at
+`_build/default/bin/beamclaw`. The CLI lives in a new `beamclaw_cli` OTP app
+(minimal — no application callback, no supervisor) that is never started as a
+daemon. Commands: `tui` (default), `start`, `stop`, `restart`,
+`remote_console`, `doctor`, `status`, `version`, `help`.
+
+### Rationale
+
+- **Self-contained**: one binary, no separate install step, portable across
+  machines with a compatible OTP installation.
+- **Exclusive stdin for TUI**: escript mode uses `-noshell` implicitly, so
+  there is no Erlang REPL sharing stdin. `bc_channel_tui`'s `io:get_line/1`
+  has uncontested access.
+- **Idiomatic OTP**: `rebar3` itself is an escript; this is the established
+  pattern for Erlang CLI tools.
+- **Embedded config**: `apply_tui_config/0` sets application env before
+  `ensure_all_started/1`, so no `sys.config` is required for the `tui`
+  command (though daemon mode reads `config/sys.config` if present).
+
+### Consequences
+
+- `rebar3 escriptize` must be run to rebuild the binary after source changes.
+- The escript binary is approximately 3–5 MB (all app beams zipped inside).
+- A new `beamclaw_cli` app is added to the umbrella; it is excluded from the
+  OTP release (`relx`) since it is not a daemon component.
+
+---
+
+## ADR-013 — Daemon lifecycle via Erlang distribution (not PID file + SIGTERM)
+
+**Date**: 2026-02-21
+**Status**: Accepted
+
+### Context
+
+`beamclaw start`/`stop`/`restart` need IPC to manage a background daemon VM.
+Common alternatives include PID files + SIGTERM (fragile — stale files, signal
+races) or a Unix socket control channel (custom protocol, more code).
+
+### Decision
+
+The daemon starts with `-sname beamclaw`, which registers with `epmd` and
+makes the node addressable at `beamclaw@localhost`. The ctl escript enables
+Erlang distribution at runtime via `net_kernel:start/1` with a unique
+short-lived node name (`beamclaw_ctl_<N>@localhost`), then uses
+`net_adm:ping/1` for liveness checks and `rpc:call(Node, init, stop, [])`
+for graceful shutdown. This is the `nodetool` pattern from relx-generated OTP
+releases.
+
+### Rationale
+
+- **No stale state**: `net_adm:ping/1` is the authoritative liveness check;
+  no PID files to go stale after a crash.
+- **Clean shutdown**: `init:stop/0` via RPC triggers full OTP shutdown — all
+  `terminate/2` callbacks run, ETS tables are written, Mnesia transactions
+  complete.
+- **Double-start prevention**: the OTP node name collision (`beamclaw@localhost`
+  already registered) prevents accidental duplicate daemons.
+- **`remote_console` for free**: once distribution is in place, printing
+  `erl -remsh beamclaw@localhost` gives the developer a live Erlang shell into
+  the running daemon.
+- **Battle-tested**: the same pattern powers RabbitMQ, Phoenix releases,
+  Nerves, and every relx-based system.
+
+### Consequences
+
+- `epmd` must be running. It is always present with an OTP installation and is
+  started automatically by the daemon VM when `-sname` is given. Users running
+  in a stripped environment may need `epmd -daemon` first.
+- Erlang magic cookie must be consistent across daemon and ctl invocations.
+  OTP auto-creates `~/.erlang.cookie` on first use; no manual configuration is
+  needed for same-user operation.
+- Multi-host distribution is not a goal; the node name `beamclaw@localhost` is
+  intentionally local-only.
