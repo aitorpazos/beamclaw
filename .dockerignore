@@ -1,0 +1,12 @@
+_build/
+.rebar3/
+doc/
+test/
+*.beam
+*.plt
+erl_crash.dump
+.git/
+.env
+*.env
+*.secret
+priv/secrets/

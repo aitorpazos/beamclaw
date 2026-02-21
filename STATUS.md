@@ -106,14 +106,21 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `rebar3 lint` clean | ✅ | elvis.config; 6 rules disabled for intentional patterns; code fixes |
 | End-to-end smoke test (TUI channel) | ✅ | 1 test; bc_provider_smoke_mock + bc_smoke_tests; also fixed bc_loop callback_mode bug |
 
-### M8 — Release ⬜
+### M8 — Documentation + Docker Release ✅
 
-| Task | Status |
-|------|--------|
-| `rebar3 release` config | ⬜ |
-| `vm.args` tuning | ⬜ |
-| `sys.config` production template | ⬜ |
-| Docker image | ⬜ |
+| Task | Status | Notes |
+|------|--------|-------|
+| `rebar3 release` config (`relx` + `docker` profile) | ✅ | Added to `rebar.config`; `{include_erts, true}` bundles ERTS |
+| `vm.args` production tuning | ✅ | `-sname`, `+sbwt none`, `+MBas aobf`, comments on every flag |
+| `sys.docker.config` | ✅ | TUI disabled; identical otherwise to `sys.config` |
+| `Dockerfile` (multi-stage) | ✅ | `erlang:28-alpine` builder → `alpine:3.21` runtime; non-root user |
+| `.dockerignore` | ✅ | Excludes `_build/`, beams, secrets, `.git/` |
+| `.gitignore` security fix | ✅ | Added `.env`, `*.env`, `*.secret`, `priv/secrets/` |
+| `README.md` rewrite | ✅ | Pitch, Docker quick-start, source quick-start, docs links |
+| `docs/building.md` | ✅ | Prerequisites, compile, test, dialyzer, release, Docker |
+| `docs/running.md` | ✅ | rebar3 shell, OTP release, Docker run, channels, MCP |
+| `docs/configuration.md` | ✅ | All env vars, sys.config keys, MCP server setup |
+| `docs/architecture.md` | ✅ | Six-app graph, supervision trees, loop state machine, behaviours |
 
 ---
 
@@ -125,4 +132,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M7 complete: 47 EUnit tests, Dialyzer clean, lint clean, smoke test passing)
+2026-02-21 (M8 complete: relx config, Docker image, .gitignore security fix, full docs/)

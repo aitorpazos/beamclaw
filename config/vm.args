@@ -1,23 +1,37 @@
-## Node name
--name beamclaw@127.0.0.1
+## Node name (local; no distribution needed for single-node container deployments)
+-sname beamclaw
 
-## Cookie
+## Erlang cluster cookie — override with BEAMCLAW_COOKIE env var at runtime.
+## The extended start script supports: ERL_FLAGS="-setcookie $BEAMCLAW_COOKIE"
 -setcookie beamclaw_dev
 
-## Heartbeat management; auto-restarts VM if it stops responding
+## Heartbeat: uncomment to auto-restart the VM if the node stops responding.
+## Useful in production; disable for interactive debugging.
 ## -heart
 
-## Enable SMP automatically based on availability
+## Scheduler threads — "auto" lets the VM match available CPU cores.
 +S auto
 
-## Increase number of concurrent ports/sockets
-+Q 65536
-
-## Set the scheduler busy wait threshold
-+sbwt none
-
-## Set async threads
+## Async thread pool size.
+## Handles blocking I/O (file, port I/O) off the schedulers.
+## 32 is a good starting point for I/O-heavy workloads.
 +A 32
 
-## Crash dump location
+## Maximum open ports (file descriptors).
+## Each open socket, file handle, and port consumes one entry.
++Q 65536
+
+## Scheduler busy-wait threshold.
+## "none" disables busy-wait entirely, reducing CPU burn when idle.
+## Appropriate for latency-tolerant workloads (AI chat is bursty, not HFT).
++sbwt none
+
+## Reduce memory footprint for idle schedulers.
++scl false
+
+## Allow the VM to return memory to the OS more aggressively.
++MBas aobf
++MBlmbcs 512
+
+## Crash dump location (writable at runtime).
 -env ERL_CRASH_DUMP /tmp/beamclaw_erl_crash.dump

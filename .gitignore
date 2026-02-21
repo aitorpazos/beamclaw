@@ -20,3 +20,9 @@ _checkouts/
 /erl_crash.dump
 doc/
 test/logs/
+
+# Secrets — never commit (CLAUDE.md security rules)
+.env
+*.env
+*.secret
+priv/secrets/
