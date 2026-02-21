@@ -122,6 +122,12 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `docs/configuration.md` | ✅ | All env vars, sys.config keys, MCP server setup |
 | `docs/architecture.md` | ✅ | Six-app graph, supervision trees, loop state machine, behaviours |
 
+### Post-M8 — Contributor Docs
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `CONTRIBUTING.md` | ✅ | Welcome, dev workflow, coding standards, security rules, AI-assisted contribution guidelines |
+
 ---
 
 ## Known Issues / Blockers
@@ -132,4 +138,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M8 complete: relx config, Docker image, .gitignore security fix, full docs/)
+2026-02-21 (Post-M8: CONTRIBUTING.md created with agentic contributor guidelines)
