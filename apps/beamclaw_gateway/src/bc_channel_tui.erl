@@ -69,32 +69,34 @@ handle_info(start_io, State) ->
     io:format("BeamClaw TUI — type a message and press Enter.~n> "),
     self() ! read_line,
     {noreply, State};
-handle_info(read_line, #{session_id := SessionId} = State) ->
-    case io:get_line("") of
-        eof -> {stop, normal, State};
-        {error, Reason} ->
-            logger:warning("[bc_channel_tui] io:get_line failed (~p); "
-                           "stdin unavailable, entering dormant mode", [Reason]),
-            {noreply, State};
-        Line ->
-            Text = string:trim(unicode:characters_to_binary(Line)),
-            case Text of
-                <<>> -> ok;
-                _ ->
-                    ChannelMsg = #bc_channel_message{
-                        session_id = SessionId,
-                        user_id    = <<"tui_user">>,
-                        channel    = tui,
-                        content    = Text,
-                        raw        = Line,
-                        ts         = erlang:system_time(millisecond)
-                        %% reply_pid unset — responses routed via send_response/2
-                    },
-                    ensure_session_and_dispatch(SessionId, ChannelMsg)
-            end,
-            self() ! read_line,
-            {noreply, State}
-    end;
+handle_info(read_line, State) ->
+    Self = self(),
+    spawn(fun() -> Self ! {line_result, io:get_line("")} end),
+    {noreply, State};
+handle_info({line_result, eof}, State) ->
+    {stop, normal, State};
+handle_info({line_result, {error, Reason}}, State) ->
+    logger:warning("[bc_channel_tui] io:get_line failed (~p); "
+                   "stdin unavailable, entering dormant mode", [Reason]),
+    {noreply, State};
+handle_info({line_result, Line}, #{session_id := SessionId} = State) ->
+    Text = string:trim(unicode:characters_to_binary(Line)),
+    case Text of
+        <<>> -> ok;
+        _ ->
+            ChannelMsg = #bc_channel_message{
+                session_id = SessionId,
+                user_id    = <<"tui_user">>,
+                channel    = tui,
+                content    = Text,
+                raw        = Line,
+                ts         = erlang:system_time(millisecond)
+                %% reply_pid unset — responses routed via send_response/2
+            },
+            ensure_session_and_dispatch(SessionId, ChannelMsg)
+    end,
+    self() ! read_line,
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
