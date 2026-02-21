@@ -5,7 +5,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## State Management
 - **Task List**: Always read and update @STATUS.md before and after every task.
 - **Decision Log**: Consult @DECISIONS.md before suggesting architectural changes.
+- **Documentation Sync**: When adding or removing a module, app, CLI command,
+  config option, HTTP route, or behaviour — or when making an architectural
+  change — update the relevant inline section(s) of this file **and** the
+  corresponding file(s) under `docs/`. See the table below.
 - **Progress Tracking**: If context window exceeds 80%, summarize the current sub-task into STATUS.md and prompt for a `/compact`.
+
+| Change type | Update in CLAUDE.md | Update in docs/ |
+|---|---|---|
+| New/removed OTP app | Application Dependency Graph, File Layout | `docs/architecture.md` |
+| New/removed module | File Layout | — |
+| Supervision tree change | Supervision Trees | `docs/architecture.md` |
+| New/removed behaviour or callback | Key Behaviours | `docs/architecture.md` |
+| New/removed CLI command | Common Commands | `docs/running.md` |
+| New/removed config key | Configuration | `docs/configuration.md` |
+| New/removed HTTP route | HTTP Gateway Routes | `docs/running.md` |
+| New rebar3 dependency | Rebar3 Dependencies | `docs/building.md` |
+| Security pattern added | Credential Scrubbing | — |
 
 ## Project Overview
 
@@ -62,6 +78,12 @@ Before merging any PR, verify:
       have a recognizable format
 - [ ] `{env, "VAR"}` used for any new config secret values
 - [ ] No new files that might contain real secrets (check with `git diff --name-only`)
+- [ ] CLAUDE.md inline sections updated for any structural changes
+      (File Layout, App Dependency Graph, Supervision Trees, Key Behaviours,
+      HTTP Gateway Routes, Rebar3 Dependencies, Common Commands)
+- [ ] `docs/` files updated for user-visible changes
+      (new commands → `running.md`; new config → `configuration.md`;
+      architecture change → `architecture.md`; build change → `building.md`)
 
 ## Technology Stack
 
