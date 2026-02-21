@@ -93,18 +93,18 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_channel_telegram` | ✅ | long-poll / webhook; `send_response/2`; race fix |
 | `bc_channel_tui` | ✅ | stdin/stdout; `send_response/2`; race fix |
 
-### M7 — Testing & Hardening ⬜
+### M7 — Testing & Hardening 🚧
 
-| Task | Status |
-|------|--------|
-| EUnit tests for `bc_scrubber` | ⬜ |
-| EUnit tests for `bc_tool_parser` | ⬜ |
-| EUnit tests for `bc_compactor` | ⬜ |
-| EUnit tests for `bc_approval` | ⬜ |
-| EUnit tests for `bc_rate_limiter` | ⬜ |
-| Dialyzer clean | ⬜ |
-| `rebar3 lint` clean | ⬜ |
-| End-to-end smoke test (TUI channel) | ⬜ |
+| Task | Status | Notes |
+|------|--------|-------|
+| EUnit tests for `bc_scrubber` | ✅ | 21 tests; all patterns + scrub_message/scrub_result |
+| EUnit tests for `bc_tool_parser` | ✅ | 13 tests; all 4 parse paths + security no-free-text rule |
+| EUnit tests for `bc_compactor` | ✅ | 3 tests; no-op paths (LLM path needs integration test) |
+| EUnit tests for `bc_approval` | ✅ | 5 tests; full/read_only/supervised/allowlist/unknown |
+| EUnit tests for `bc_rate_limiter` | ✅ | 4 tests; allow/within-limit/exceed/client-isolation |
+| Dialyzer clean | ⬜ | |
+| `rebar3 lint` clean | ⬜ | |
+| End-to-end smoke test (TUI channel) | ⬜ | |
 
 ### M8 — Release ⬜
 
@@ -125,4 +125,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (M6 complete: gateway, response routing wired end-to-end)
+2026-02-21 (M7 partial: 46 EUnit tests passing across 5 modules; Dialyzer/lint/smoke test remain)
