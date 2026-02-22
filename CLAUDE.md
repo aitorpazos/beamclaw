@@ -122,6 +122,12 @@ beamclaw skills list         # list discovered skills
 beamclaw skills status       # detailed requirements check
 beamclaw skills show NAME    # show skill content
 beamclaw skills install NAME # install skill dependencies
+
+# Pairing / access control (via CLI escript)
+beamclaw pair                       # list pending + approved
+beamclaw pair list                  # same as above
+beamclaw pair telegram <CODE>       # approve a pending request
+beamclaw pair revoke telegram <ID>  # revoke user from allowlist
 ```
 
 ---
@@ -497,7 +503,8 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
 {beamclaw_gateway, [
     {http, #{port => 8080}},
     {channels, [
-        {telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"}, mode => long_poll}},
+        {telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"}, mode => long_poll,
+                     dm_policy => pairing, allow_from => []}},
         {tui,      #{enabled => true}}
     ]}
 ]},
@@ -634,6 +641,7 @@ beamclaw/
         bc_skill_discovery.erl      %% discover skills from bundled + workspace
         bc_skill_eligibility.erl    %% check skill requirements (tools, MCP, env)
         bc_skill_installer.erl      %% install skill dependencies
+        bc_pairing.erl              %% channel access control via pairing codes
       priv/
         skills/                     %% bundled example skills
     beamclaw_gateway/src/
@@ -653,5 +661,5 @@ beamclaw/
       bc_webhook_telegram_h.erl
     beamclaw_cli/src/
       beamclaw_cli.app.src
-      beamclaw_cli.erl        %% escript main; 19 commands (tui/start/stop/restart/remote_console/agent create/list/show/delete/rehatch/skills list/status/show/install/doctor/status/version/help)
+      beamclaw_cli.erl        %% escript main; 22 commands (tui/start/stop/restart/remote_console/agent create/list/show/delete/rehatch/skills list/status/show/install/pair/pair list/pair approve/pair revoke/doctor/status/version/help)
 ```

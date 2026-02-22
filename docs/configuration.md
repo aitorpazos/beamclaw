@@ -129,7 +129,15 @@ to the agentic loop.
     {channels, [
         {telegram, #{
             token => {env, "TELEGRAM_BOT_TOKEN"},
-            mode  => long_poll   %% or: webhook
+            mode  => long_poll,  %% or: webhook
+            %% Access control policy for direct messages.
+            %% pairing   — unknown users get a code; blocked until approved (default)
+            %% allowlist — unknown users silently dropped; no codes issued
+            %% open      — no access control (not recommended)
+            dm_policy  => pairing,
+            %% Static allowlist of Telegram user IDs (binaries).
+            %% Merged with the pairing store — users here are always allowed.
+            allow_from => []
         }},
         {tui, #{
             enabled => true      %% set false in Docker (sys.docker.config)

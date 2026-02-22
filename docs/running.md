@@ -20,6 +20,9 @@ Commands:
   agent show NAME      Show agent bootstrap files
   agent delete NAME    Delete an agent workspace
   agent rehatch NAME   Factory reset: restore all files to defaults
+  pair [list]          List pending and approved pairing requests
+  pair <channel> CODE  Approve a pending pairing request
+  pair revoke CH ID    Revoke a user from a channel's allowlist
   doctor               Check environment and connectivity
   status               Ping running gateway HTTP health endpoint
   version              Print version
@@ -218,6 +221,70 @@ Per-agent skills override global skills with the same name:
 1. Bundled (lowest): shipped with BeamClaw
 2. Global: `~/.beamclaw/skills/*/SKILL.md`
 3. Per-agent (highest): `~/.beamclaw/agents/<name>/skills/*/SKILL.md`
+
+### Telegram Pairing (Access Control)
+
+By default, BeamClaw's Telegram channel uses **pairing** to control access.
+Unknown users who message the bot receive a pairing code; the bot owner
+approves the code via CLI, and the user is added to a persistent allowlist.
+
+#### Pairing flow
+
+1. Unknown user sends a message to the bot
+2. Bot replies with a pairing code:
+   ```
+   BeamClaw: pairing required.
+
+   Your ID: 123456789
+   Code: HJKL7M2P
+
+   Run: beamclaw pair telegram HJKL7M2P
+   ```
+3. Bot owner approves: `beamclaw pair telegram HJKL7M2P`
+4. User is now allowed — future messages reach the agent
+
+#### CLI commands
+
+```bash
+beamclaw pair                       # list pending + approved (default)
+beamclaw pair list                  # same as above
+beamclaw pair telegram <CODE>       # approve a pending request
+beamclaw pair revoke telegram <ID>  # remove user from allowlist
+```
+
+#### DM policy modes
+
+Set `dm_policy` in the Telegram channel config (`sys.config`):
+
+| Policy | Behaviour |
+|--------|-----------|
+| `pairing` | Unknown users get a code; blocked until approved **(default)** |
+| `allowlist` | Unknown users silently dropped; no codes issued |
+| `open` | No access control (legacy behaviour, not recommended) |
+
+When `BEAMCLAW_USER` is set, pairing is bypassed entirely — all users
+collapse to the canonical identity (single-user trust mode).
+
+#### Hardcoded allowlist
+
+In addition to the pairing store, you can specify a static `allow_from` list
+in `sys.config`:
+
+```erlang
+{telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"},
+             mode => long_poll,
+             dm_policy => pairing,
+             allow_from => [<<"123456789">>]}}
+```
+
+Users in `allow_from` are always allowed regardless of pairing state.
+
+#### Storage
+
+Pairing data is stored as JSON files under `~/.beamclaw/pairing/`:
+
+- `telegram-pending.json` — pending pairing requests (max 3, 1-hour TTL)
+- `telegram-allowed.json` — approved user IDs
 
 ### Environment variables
 

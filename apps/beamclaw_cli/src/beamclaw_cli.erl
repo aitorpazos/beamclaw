@@ -18,7 +18,7 @@
 -moduledoc """
 BeamClaw CLI entry point (escript).
 
-Usage: beamclaw [tui|start|stop|restart|remote_console|agent|skills|doctor|status|version|help]
+Usage: beamclaw [tui|start|stop|restart|remote_console|agent|skills|pair|doctor|status|version|help]
 
 Built with: rebar3 escriptize
 Output:     _build/default/bin/beamclaw
@@ -38,6 +38,8 @@ Output:     _build/default/bin/beamclaw
                              cmd_agent_rehatch/1,
                              cmd_skills_list/0, cmd_skills_status/0,
                              cmd_skills_show/1, cmd_skills_install/1,
+                             cmd_pair_list/0, cmd_pair_approve/2,
+                             cmd_pair_revoke/2,
                              spawn_daemon/0, check_openrouter_network/0]}).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
@@ -68,6 +70,10 @@ main(["skills", "list"          | _])     -> cmd_skills_list();
 main(["skills", "install", Name | _])     -> cmd_skills_install(list_to_binary(Name));
 main(["skills", "show", Name    | _])     -> cmd_skills_show(list_to_binary(Name));
 main(["skills"                  | _])     -> cmd_skills_list();
+main(["pair", "list"            | _])     -> cmd_pair_list();
+main(["pair", "revoke", Ch, Id  | _])     -> cmd_pair_revoke(list_to_atom(Ch), list_to_binary(Id));
+main(["pair", Ch, Code          | _])     -> cmd_pair_approve(list_to_atom(Ch), list_to_binary(Code));
+main(["pair"                    | _])     -> cmd_pair_list();
 main(["doctor"                  | _])     -> cmd_doctor();
 main(["status"                  | _])     -> cmd_status();
 main(["version"                 | _])     -> cmd_version();
@@ -283,7 +289,8 @@ cmd_doctor() ->
         check_telegram_token(),
         check_epmd(),
         check_workspace(),
-        check_skills_dir()
+        check_skills_dir(),
+        check_pairing_dir()
     ],
     AllChecks = case os:getenv("OPENROUTER_API_KEY") of
         false -> Checks;
@@ -539,6 +546,76 @@ cmd_skills_install(Name) ->
             end
     end.
 
+-doc "List pending and approved pairing requests across all channels.".
+cmd_pair_list() ->
+    Channels = [telegram],
+    io:format("Pending:~n"),
+    HasPending = lists:foldl(fun(Ch, Acc) ->
+        Pending = bc_pairing:list_pending(Ch),
+        lists:foreach(fun(R) ->
+            Code     = maps:get(<<"code">>, R),
+            Id       = maps:get(<<"id">>, R),
+            Meta     = maps:get(<<"meta">>, R, #{}),
+            Username = maps:get(<<"username">>, Meta, <<>>),
+            Created  = maps:get(<<"created_at">>, R, 0),
+            AgoMin   = (erlang:system_time(millisecond) - Created) div 60000,
+            UserTag  = case Username of
+                <<>> -> "";
+                U    -> "  @" ++ binary_to_list(U)
+            end,
+            io:format("  ~s  ~s  id=~s~s  (~pm ago)~n",
+                      [Ch, Code, Id, UserTag, AgoMin])
+        end, Pending),
+        Acc orelse Pending =/= []
+    end, false, Channels),
+    case HasPending of
+        false -> io:format("  (none)~n");
+        true  -> ok
+    end,
+    io:format("~nApproved:~n"),
+    HasApproved = lists:foldl(fun(Ch, Acc) ->
+        Allowed = bc_pairing:list_allowed(Ch),
+        lists:foreach(fun(Id) ->
+            io:format("  ~s  ~s~n", [Ch, Id])
+        end, Allowed),
+        Acc orelse Allowed =/= []
+    end, false, Channels),
+    case HasApproved of
+        false -> io:format("  (none)~n");
+        true  -> ok
+    end,
+    halt(0).
+
+-doc "Approve a pending pairing request by channel and code.".
+cmd_pair_approve(Channel, Code) ->
+    case bc_pairing:approve(Channel, Code) of
+        {ok, UserId} ->
+            io:format("Approved ~s user ~s.~n", [Channel, UserId]),
+            halt(0);
+        {error, not_found} ->
+            io:format(standard_error,
+                      "beamclaw: no pending request with code '~s' for ~s~n",
+                      [Code, Channel]),
+            halt(1);
+        {error, expired} ->
+            io:format(standard_error,
+                      "beamclaw: code '~s' has expired~n", [Code]),
+            halt(1)
+    end.
+
+-doc "Revoke an approved user from a channel's allowlist.".
+cmd_pair_revoke(Channel, UserId) ->
+    case bc_pairing:revoke(Channel, UserId) of
+        ok ->
+            io:format("Revoked ~s user ~s.~n", [Channel, UserId]),
+            halt(0);
+        {error, not_found} ->
+            io:format(standard_error,
+                      "beamclaw: user '~s' not found in ~s allowlist~n",
+                      [UserId, Channel]),
+            halt(1)
+    end.
+
 cmd_help() ->
     io:format(
         "Usage: beamclaw <command>~n~n"
@@ -558,6 +635,9 @@ cmd_help() ->
         "  skills status        Detailed requirements check for all skills~n"
         "  skills show NAME     Show a skill's SKILL.md content~n"
         "  skills install NAME  Install a skill's dependencies~n"
+        "  pair [list]          List pending and approved pairing requests~n"
+        "  pair <channel> CODE  Approve a pending pairing request~n"
+        "  pair revoke CH ID    Revoke a user from a channel's allowlist~n"
         "  doctor               Check environment and connectivity~n"
         "  status               Ping running gateway HTTP health endpoint~n"
         "  version              Print version~n"
@@ -642,7 +722,9 @@ apply_tui_config() ->
     Channels = case os:getenv("TELEGRAM_BOT_TOKEN") of
         false -> [TuiChannel];
         _     -> [{telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"},
-                               mode  => long_poll}},
+                               mode  => long_poll,
+                               dm_policy => pairing,
+                               allow_from => []}},
                   TuiChannel]
     end,
     application:set_env(beamclaw_gateway, channels, Channels,
@@ -872,6 +954,19 @@ check_skills_dir() ->
                 " (" ++ integer_to_list(length(Skills)) ++ " skills)");
         false ->
             print_check(info, "Skills directory not found: " ++ Dir)
+    end.
+
+check_pairing_dir() ->
+    Dir = bc_pairing:pairing_dir(),
+    case filelib:is_dir(Dir) of
+        true ->
+            Allowed = bc_pairing:list_allowed(telegram),
+            Pending = bc_pairing:list_pending(telegram),
+            print_check(ok, "Pairing directory: " ++ Dir ++
+                " (" ++ integer_to_list(length(Allowed)) ++ " approved, " ++
+                integer_to_list(length(Pending)) ++ " pending)");
+        false ->
+            print_check(info, "Pairing directory not found: " ++ Dir)
     end.
 
 check_openrouter_network() ->

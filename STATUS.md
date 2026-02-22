@@ -4,8 +4,9 @@
 
 Scaffolding is complete. All seven OTP apps compile clean with zero warnings.
 Multi-agent workspaces (M11–M13), rich templates (M14), daily logs (M15),
-skill system (M16–M17), session persistence (M18), and cross-channel session
-sharing (M19) are complete. Cross-channel session fix applied. 180 EUnit tests pass.
+skill system (M16–M17), session persistence (M18), cross-channel session
+sharing (M19), and Telegram pairing access control (M20) are complete.
+Cross-channel session fix applied. 192 EUnit tests pass.
 
 ---
 
@@ -328,6 +329,19 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | Compilation clean | ✅ | 0 warnings |
 | All 180 tests pass | ✅ | No regressions |
 
+### M20 — Telegram Pairing (Access Control) ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_pairing.erl` | ✅ | Pure functional module; file-based JSON storage; code gen, TTL, capacity |
+| `bc_pairing_tests.erl` | ✅ | 12 tests: allowed, request, idempotent, approve, revoke, expiry, capacity |
+| `bc_channel_telegram.erl` update | ✅ | `dm_policy` check (pairing/allowlist/open); pairing reply message |
+| `beamclaw_cli.erl` update | ✅ | `pair` / `pair list` / `pair <ch> <code>` / `pair revoke <ch> <id>` commands |
+| `sys.config` update | ✅ | `dm_policy => pairing`, `allow_from => []` in telegram config |
+| `CLAUDE.md` update | ✅ | File Layout, Common Commands, Configuration sections |
+| `docs/running.md` update | ✅ | Telegram Pairing section with flow, CLI, modes, storage |
+| `docs/configuration.md` update | ✅ | `dm_policy` and `allow_from` config keys documented |
+
 ---
 
 ## Known Issues / Blockers
@@ -338,4 +352,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (EEP-59 doc migration — 180 tests, 0 warnings)
+2026-02-22 (Telegram pairing access control — M20)

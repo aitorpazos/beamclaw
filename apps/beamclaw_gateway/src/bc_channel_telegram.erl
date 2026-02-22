@@ -159,11 +159,37 @@ dispatch_telegram_message(Update) ->
     Chat   = maps:get(<<"chat">>,    Msg,    #{}),
     TgUserId = integer_to_binary(maps:get(<<"id">>, From, 0)),
     ChatId   = integer_to_binary(maps:get(<<"id">>, Chat, 0)),
-    UserId = case bc_config:canonical_user_id() of
-        undefined -> <<"tg:", TgUserId/binary>>;
-        Canonical -> Canonical
-    end,
-    AgentId  = bc_config:get(beamclaw_core, default_agent, <<"default">>),
+    Username = maps:get(<<"username">>, From, <<>>),
+    case bc_config:canonical_user_id() of
+        Canonical when Canonical =/= undefined ->
+            %% BEAMCLAW_USER set — skip pairing, proceed as canonical user
+            do_dispatch(Canonical, TgUserId, ChatId, Text, Msg);
+        undefined ->
+            DmPolicy = get_dm_policy(),
+            case DmPolicy of
+                open ->
+                    do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Text, Msg);
+                _ ->
+                    case is_user_allowed(TgUserId) of
+                        true ->
+                            do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Text, Msg);
+                        false when DmPolicy =:= pairing ->
+                            Meta = #{<<"username">> => Username},
+                            {ok, Code, Status} = bc_pairing:request_pairing(telegram, TgUserId, Meta),
+                            case Status of
+                                created -> send_pairing_reply(ChatId, TgUserId, Code);
+                                existing -> ok
+                            end,
+                            ok;
+                        false ->
+                            %% allowlist mode — silently drop
+                            ok
+                    end
+            end
+    end.
+
+do_dispatch(UserId, _TgUserId, ChatId, Text, Msg) ->
+    AgentId   = bc_config:get(beamclaw_core, default_agent, <<"default">>),
     SessionId = bc_session_registry:derive_session_id(UserId, AgentId, telegram),
     %% Map the derived SessionId to the Telegram ChatId for response routing.
     ets:insert(bc_telegram_chat_map, {SessionId, ChatId}),
@@ -193,6 +219,36 @@ dispatch_telegram_message(Update) ->
             {ok, Pid} = bc_session_registry:lookup(SessionId),
             bc_session:dispatch_run(Pid, ChannelMsg)
     end.
+
+get_dm_policy() ->
+    Channels = bc_config:get(beamclaw_gateway, channels, []),
+    TgConfig = proplists:get_value(telegram, Channels, #{}),
+    maps:get(dm_policy, TgConfig, pairing).
+
+is_user_allowed(TgUserId) ->
+    %% Check config allow_from list
+    Channels = bc_config:get(beamclaw_gateway, channels, []),
+    TgConfig = proplists:get_value(telegram, Channels, #{}),
+    AllowFrom = maps:get(allow_from, TgConfig, []),
+    ConfigAllowed = lists:member(TgUserId, [iolist_to_binary([Id]) || Id <- AllowFrom]),
+    %% Check pairing store
+    PairingAllowed = bc_pairing:is_allowed(telegram, TgUserId),
+    ConfigAllowed orelse PairingAllowed.
+
+send_pairing_reply(ChatId, TgUserId, Code) ->
+    Text = iolist_to_binary([
+        <<"BeamClaw: pairing required.\n\n">>,
+        <<"Your ID: ">>, TgUserId, <<"\n">>,
+        <<"Code: ">>, Code, <<"\n\n">>,
+        <<"Run: beamclaw pair telegram ">>, Code
+    ]),
+    Token = resolve_token(),
+    send_message(binary_to_integer(ChatId), Text, #{token => Token}).
+
+resolve_token() ->
+    Channels = bc_config:get(beamclaw_gateway, channels, []),
+    TgConfig = proplists:get_value(telegram, Channels, #{}),
+    bc_config:resolve(maps:get(token, TgConfig, {env, "TELEGRAM_BOT_TOKEN"})).
 
 send_message(ChatId, Text, #{token := Token}) ->
     Url  = "https://api.telegram.org/bot" ++ Token ++ "/sendMessage",
