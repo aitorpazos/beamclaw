@@ -378,6 +378,15 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `sys.docker.config` full sync | ✅ | Added kernel logger (console-only), default_agent, session persistence/sharing/cleanup, skills, dm_policy, allow_from |
 | `docs/configuration.md` update | ✅ | Docker-Specific Config section lists both differences (TUI + logger) |
 
+### Post-M20 — Docker CLI Control (`beamclaw-ctl`) ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `Dockerfile` escriptize step | ✅ | `rebar3 escriptize` in build stage |
+| `Dockerfile` escript copy | ✅ | Copied as `/opt/beamclaw/beamclaw-ctl` |
+| `Dockerfile` wrapper script | ✅ | `/usr/local/bin/beamclaw-ctl` runs escript via release ERTS |
+| `docs/running.md` update | ✅ | Docker CLI control section with usage examples |
+
 ---
 
 ## Known Issues / Blockers
@@ -388,4 +397,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (Sync sys.docker.config — Post-M20)
+2026-02-22 (Docker CLI control — Post-M20)

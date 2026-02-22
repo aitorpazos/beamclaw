@@ -404,6 +404,46 @@ docker stop beamclaw
 docker rm beamclaw
 ```
 
+### CLI control (`beamclaw-ctl`)
+
+The Docker image includes the full `beamclaw` CLI escript as `beamclaw-ctl`.
+Use it via `docker exec` to manage agents, skills, pairing, and more:
+
+```bash
+# Agent management
+docker exec beamclaw beamclaw-ctl agent list
+docker exec beamclaw beamclaw-ctl agent create my-assistant
+docker exec beamclaw beamclaw-ctl agent show my-assistant
+docker exec beamclaw beamclaw-ctl agent rehatch my-assistant
+docker exec beamclaw beamclaw-ctl agent delete my-assistant
+
+# Skills
+docker exec beamclaw beamclaw-ctl skills list
+docker exec beamclaw beamclaw-ctl skills status
+docker exec beamclaw beamclaw-ctl skills show example-skill
+
+# Pairing (Telegram access control)
+docker exec beamclaw beamclaw-ctl pair list
+docker exec beamclaw beamclaw-ctl pair telegram HJKL7M2P
+docker exec beamclaw beamclaw-ctl pair revoke telegram 123456789
+
+# Health and diagnostics
+docker exec beamclaw beamclaw-ctl status
+docker exec beamclaw beamclaw-ctl doctor
+docker exec beamclaw beamclaw-ctl version
+
+# Interactive TUI (requires -it for stdin)
+docker exec -it beamclaw beamclaw-ctl tui --agent default
+```
+
+The release's low-level OTP commands are also available:
+
+```bash
+docker exec beamclaw /opt/beamclaw/bin/beamclaw ping
+docker exec beamclaw /opt/beamclaw/bin/beamclaw rpc 'module' 'function' '[args]'
+docker exec -it beamclaw /opt/beamclaw/bin/beamclaw remote_console
+```
+
 ---
 
 ## Channel Selection

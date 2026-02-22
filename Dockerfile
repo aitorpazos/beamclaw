@@ -17,6 +17,7 @@ RUN rebar3 get-deps
 COPY apps/ apps/
 COPY config/ config/
 RUN rebar3 as docker release
+RUN rebar3 escriptize
 
 ## ---- Stage 2: Minimal runtime ----------------------------------------------
 FROM alpine:3.23
@@ -31,6 +32,14 @@ RUN addgroup -S beamclaw && adduser -S beamclaw -G beamclaw
 # Copy the self-contained OTP release (includes ERTS, no other Erlang needed)
 COPY --from=builder --chown=beamclaw:beamclaw \
      /build/_build/docker/rel/beamclaw /opt/beamclaw
+
+# Copy the CLI escript (high-level commands: agent, skills, pair, doctor, etc.)
+COPY --from=builder --chown=beamclaw:beamclaw \
+     /build/_build/default/bin/beamclaw /opt/beamclaw/beamclaw-ctl
+
+# Convenience wrapper so `beamclaw-ctl <cmd>` works directly
+RUN printf '#!/bin/sh\nexec /opt/beamclaw/bin/beamclaw escript /opt/beamclaw/beamclaw-ctl "$@"\n' \
+    > /usr/local/bin/beamclaw-ctl && chmod +x /usr/local/bin/beamclaw-ctl
 
 USER beamclaw
 WORKDIR /opt/beamclaw
