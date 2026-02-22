@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   change — update the relevant inline section(s) of this file **and** the
   corresponding file(s) under `docs/`. See the table below.
 - **Progress Tracking**: If context window exceeds 80%, summarize the current sub-task into STATUS.md and prompt for a `/compact`.
+- **Human-only files**: Do not read or reference `HUMAN_NOTES.md` — this file is for human engineers only.
 
 | Change type | Update in CLAUDE.md | Update in docs/ |
 |---|---|---|
