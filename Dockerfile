@@ -27,7 +27,7 @@ FROM alpine:3.23
 RUN apk add --no-cache ncurses-libs openssl libstdc++ libgcc
 
 # Non-root user for principle-of-least-privilege
-RUN addgroup -S beamclaw && adduser -S beamclaw -G beamclaw
+RUN addgroup -S beamclaw && adduser -S beamclaw -G beamclaw -h /home/beamclaw
 
 # Copy the self-contained OTP release (includes ERTS, no other Erlang needed)
 COPY --from=builder --chown=beamclaw:beamclaw \
