@@ -14,19 +14,21 @@
 %% limitations under the License.
 %%
 
-%% @doc Skill installer — runs install specs from SKILL.md metadata.
-%%
-%% Reads metadata.beamclaw.install array from a skill's metadata and
-%% attempts installation using the first compatible installer.
-%%
-%% Supported kinds: apt, brew, npm, pip, download.
 -module(bc_skill_installer).
+-moduledoc """
+Skill installer — runs install specs from SKILL.md metadata.
+
+Reads metadata.beamclaw.install array from a skill's metadata and
+attempts installation using the first compatible installer.
+
+Supported kinds: apt, brew, npm, pip, download.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([install/1, available_install_specs/1]).
 
-%% @doc Attempt to install a skill's dependencies.
+-doc "Attempt to install a skill's dependencies.".
 -spec install(#bc_skill{}) -> ok | {error, term()}.
 install(#bc_skill{metadata = Metadata}) ->
     Beamclaw = maps:get(<<"beamclaw">>, Metadata, #{}),
@@ -42,7 +44,7 @@ install(#bc_skill{metadata = Metadata}) ->
         _ -> {error, invalid_install_specs}
     end.
 
-%% @doc Return install specs that are compatible with the current system.
+-doc "Return install specs that are compatible with the current system.".
 -spec available_install_specs(#bc_skill{}) -> [map()].
 available_install_specs(#bc_skill{metadata = Metadata}) ->
     Beamclaw = maps:get(<<"beamclaw">>, Metadata, #{}),

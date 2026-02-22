@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in terminal tool — runs a single shell command.
 -module(bc_tool_terminal).
+-moduledoc "Built-in terminal tool — runs a single shell command.".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

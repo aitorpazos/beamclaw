@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in bash tool — runs a bash script (multi-line supported).
 -module(bc_tool_bash).
+-moduledoc "Built-in bash tool — runs a bash script (multi-line supported).".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

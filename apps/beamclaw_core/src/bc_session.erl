@@ -14,16 +14,18 @@
 %% limitations under the License.
 %%
 
-%% @doc Session gen_server — the "lane."
-%%
-%% Permanent process. Holds conversation history and serializes runs via a
-%% pending_runs queue. When the loop is busy, incoming runs are enqueued.
-%% When the loop completes (turn_complete), the next run is dispatched.
-%%
-%% History survives loop crashes because bc_session is permanent and bc_loop
-%% is transient. On bc_loop restart, bc_loop:init/1 looks up this process via
-%% bc_session_registry, fetches history, and announces its new PID here.
 -module(bc_session).
+-moduledoc """
+Session gen_server — the "lane."
+
+Permanent process. Holds conversation history and serializes runs via a
+pending_runs queue. When the loop is busy, incoming runs are enqueued.
+When the loop completes (turn_complete), the next run is dispatched.
+
+History survives loop crashes because bc_session is permanent and bc_loop
+is transient. On bc_loop restart, bc_loop:init/1 looks up this process via
+bc_session_registry, fetches history, and announces its new PID here.
+""".
 -behaviour(gen_server).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
@@ -61,44 +63,48 @@
 start_link(Config) ->
     gen_server:start_link(?MODULE, Config, []).
 
-%% @doc Dispatch a new user run (message) to this session.
+-doc "Dispatch a new user run (message) to this session.".
 -spec dispatch_run(Pid :: pid(), Message :: #bc_channel_message{}) -> ok.
 dispatch_run(Pid, Message) ->
     gen_server:cast(Pid, {dispatch_run, Message}).
 
-%% @doc Retrieve the full conversation history.
+-doc "Retrieve the full conversation history.".
 -spec get_history(Pid :: pid()) -> [#bc_message{}].
 get_history(Pid) ->
     gen_server:call(Pid, get_history).
 
-%% @doc Replace the full conversation history (called by bc_compactor).
+-doc "Replace the full conversation history (called by bc_compactor).".
 -spec set_history(Pid :: pid(), History :: [#bc_message{}]) -> ok.
 set_history(Pid, History) ->
     gen_server:cast(Pid, {set_history, History}).
 
-%% @doc Return the channel module for this session.
-%% Deprecated: bc_loop now uses per-run reply_channel instead.
+-doc """
+Return the channel module for this session.
+Deprecated: bc_loop now uses per-run reply_channel instead.
+""".
 -spec get_channel_mod(Pid :: pid()) -> module() | undefined.
 get_channel_mod(Pid) ->
     gen_server:call(Pid, get_channel_mod).
 
-%% @doc Return the agent ID for this session.
+-doc "Return the agent ID for this session.".
 -spec get_agent_id(Pid :: pid()) -> binary().
 get_agent_id(Pid) ->
     gen_server:call(Pid, get_agent_id).
 
-%% @doc Append a single message to history (called by bc_loop).
+-doc "Append a single message to history (called by bc_loop).".
 -spec append_message(Pid :: pid(), Message :: #bc_message{}) -> ok.
 append_message(Pid, Message) ->
     gen_server:cast(Pid, {append_message, Message}).
 
-%% @doc Update the loop pid reference. Called by bc_loop:init/1.
-%% Drains the pending_runs queue if messages arrived before the loop started.
+-doc """
+Update the loop pid reference. Called by bc_loop:init/1.
+Drains the pending_runs queue if messages arrived before the loop started.
+""".
 -spec set_loop_pid(Pid :: pid(), LoopPid :: pid()) -> ok.
 set_loop_pid(Pid, LoopPid) ->
     gen_server:cast(Pid, {set_loop_pid, LoopPid}).
 
-%% @doc Called by bc_loop when a turn completes. Dequeues next run if any.
+-doc "Called by bc_loop when a turn completes. Dequeues next run if any.".
 -spec turn_complete(Pid :: pid(), Result :: term()) -> ok.
 turn_complete(Pid, Result) ->
     gen_server:cast(Pid, {turn_complete, Result}).

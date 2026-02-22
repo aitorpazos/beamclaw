@@ -14,16 +14,18 @@
 %% limitations under the License.
 %%
 
-%% @doc Agent workspace management — filesystem operations.
-%%
-%% Pure functional module (no gen_server). Manages agent workspace directories
-%% under ~/.beamclaw/agents/<agent-id>/, each containing seven markdown bootstrap
-%% files (SOUL.md, IDENTITY.md, USER.md, TOOLS.md, MEMORY.md, AGENTS.md,
-%% BOOTSTRAP.md) and a memory/ subdirectory for daily logs.
-%%
-%% The base directory defaults to $HOME/.beamclaw/agents/ but can be overridden
-%% via the BEAMCLAW_HOME environment variable.
 -module(bc_workspace).
+-moduledoc """
+Agent workspace management — filesystem operations.
+
+Pure functional module (no gen_server). Manages agent workspace directories
+under ~/.beamclaw/agents/<agent-id>/, each containing seven markdown bootstrap
+files (SOUL.md, IDENTITY.md, USER.md, TOOLS.md, MEMORY.md, AGENTS.md,
+BOOTSTRAP.md) and a memory/ subdirectory for daily logs.
+
+The base directory defaults to $HOME/.beamclaw/agents/ but can be overridden
+via the BEAMCLAW_HOME environment variable.
+""".
 
 %% CLI command functions call halt/1 which dialyzer sees as "only terminates
 %% with explicit exception". The delete_dir_recursive helper intentionally
@@ -48,7 +50,7 @@
 
 -define(MAX_BOOTSTRAP_SIZE, 20480). %% 20 KB
 
-%% @doc Return the base directory for all agent workspaces.
+-doc "Return the base directory for all agent workspaces.".
 -spec base_dir() -> string().
 base_dir() ->
     case os:getenv("BEAMCLAW_HOME") of
@@ -59,12 +61,12 @@ base_dir() ->
             filename:join([Dir, "agents"])
     end.
 
-%% @doc Return the directory for a specific agent.
+-doc "Return the directory for a specific agent.".
 -spec agent_dir(binary()) -> string().
 agent_dir(AgentId) ->
     filename:join(base_dir(), binary_to_list(AgentId)).
 
-%% @doc Create the default agent workspace if it doesn't exist. Idempotent.
+-doc "Create the default agent workspace if it doesn't exist. Idempotent.".
 -spec ensure_default_agent() -> ok.
 ensure_default_agent() ->
     case create_agent(<<"default">>) of
@@ -72,7 +74,7 @@ ensure_default_agent() ->
         {error, exists} -> ok
     end.
 
-%% @doc Create a new agent workspace with all six template files.
+-doc "Create a new agent workspace with all six template files.".
 -spec create_agent(binary()) -> ok | {error, exists | invalid_agent_id}.
 create_agent(AgentId) ->
     case validate_agent_id(AgentId) of
@@ -99,8 +101,10 @@ create_agent(AgentId) ->
             end
     end.
 
-%% @doc Factory reset: restore all bootstrap files to defaults and wipe daily logs.
-%% Preserves the skills/ subdirectory.
+-doc """
+Factory reset: restore all bootstrap files to defaults and wipe daily logs.
+Preserves the skills/ subdirectory.
+""".
 -spec rehatch_agent(binary()) -> ok | {error, not_found | invalid_agent_id}.
 rehatch_agent(AgentId) ->
     case validate_agent_id(AgentId) of
@@ -129,7 +133,9 @@ rehatch_agent(AgentId) ->
             end
     end.
 
-%% @doc Delete an agent workspace. Refuses to delete "default".
+-doc """
+Delete an agent workspace. Refuses to delete "default".
+""".
 -spec delete_agent(binary()) -> ok | {error, atom() | {no_translation, binary()}}.
 delete_agent(<<"default">>) ->
     {error, cannot_delete_default};
@@ -144,7 +150,7 @@ delete_agent(AgentId) ->
             end
     end.
 
-%% @doc List all agent IDs (directory names under base_dir).
+-doc "List all agent IDs (directory names under base_dir).".
 -spec list_agents() -> [binary()].
 list_agents() ->
     Base = base_dir(),
@@ -157,12 +163,12 @@ list_agents() ->
             []
     end.
 
-%% @doc Check whether an agent workspace exists.
+-doc "Check whether an agent workspace exists.".
 -spec agent_exists(binary()) -> boolean().
 agent_exists(AgentId) ->
     filelib:is_dir(agent_dir(AgentId)).
 
-%% @doc Read a single bootstrap file. Truncates at 20 KB.
+-doc "Read a single bootstrap file. Truncates at 20 KB.".
 -spec read_bootstrap_file(binary(), binary()) -> {ok, binary()} | {error, atom()}.
 read_bootstrap_file(AgentId, Filename) ->
     Path = filename:join(agent_dir(AgentId), binary_to_list(Filename)),
@@ -176,13 +182,13 @@ read_bootstrap_file(AgentId, Filename) ->
             {error, Reason}
     end.
 
-%% @doc Write content to a bootstrap file.
+-doc "Write content to a bootstrap file.".
 -spec write_bootstrap_file(binary(), binary(), binary()) -> ok | {error, term()}.
 write_bootstrap_file(AgentId, Filename, Content) ->
     Path = filename:join(agent_dir(AgentId), binary_to_list(Filename)),
     file:write_file(Path, Content).
 
-%% @doc Read all seven bootstrap files. Missing files map to undefined.
+-doc "Read all seven bootstrap files. Missing files map to undefined.".
 -spec read_all_bootstrap_files(binary()) -> #{binary() => binary() | undefined}.
 read_all_bootstrap_files(AgentId) ->
     Files = [<<"IDENTITY.md">>, <<"SOUL.md">>, <<"USER.md">>,
@@ -195,7 +201,9 @@ read_all_bootstrap_files(AgentId) ->
         end
     end, Files)).
 
-%% @doc Read a daily log file for a given date (<<"YYYY-MM-DD">>).
+-doc """
+Read a daily log file for a given date (<<"YYYY-MM-DD">>).
+""".
 -spec read_daily_log(binary(), binary()) -> {ok, binary()} | {error, atom()}.
 read_daily_log(AgentId, Date) ->
     Path = filename:join([agent_dir(AgentId), "memory",
@@ -208,7 +216,7 @@ read_daily_log(AgentId, Date) ->
         {error, _} -> {error, not_found}
     end.
 
-%% @doc List available daily log files (returns filenames, newest first, max 30).
+-doc "List available daily log files (returns filenames, newest first, max 30).".
 -spec list_daily_logs(binary()) -> [binary()].
 list_daily_logs(AgentId) ->
     Dir = filename:join(agent_dir(AgentId), "memory"),
@@ -220,7 +228,7 @@ list_daily_logs(AgentId) ->
         {error, _} -> []
     end.
 
-%% @doc Validate an agent ID: must match ^[a-z0-9_-]+$.
+-doc "Validate an agent ID: must match ^[a-z0-9_-]+$.".
 -spec validate_agent_id(binary()) -> ok | {error, invalid_agent_id}.
 validate_agent_id(AgentId) when is_binary(AgentId) ->
     case re:run(AgentId, "^[a-z0-9_-]+$", [{capture, none}]) of

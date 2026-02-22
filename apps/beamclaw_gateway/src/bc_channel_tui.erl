@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc TUI (terminal UI) channel — reads from stdin, writes to stdout.
-%% Implements bc_channel behaviour.
-%%
-%% bc_loop calls send_response/2 after each completed turn. The gen_server
-%% handles {send_response, ...} casts and writes the response to stdout.
 -module(bc_channel_tui).
+-moduledoc """
+TUI (terminal UI) channel — reads from stdin, writes to stdout.
+Implements bc_channel behaviour.
+
+bc_loop calls send_response/2 after each completed turn. The gen_server
+handles {send_response, ...} casts and writes the response to stdout.
+""".
 -behaviour(gen_server).
 %% Implements bc_channel callbacks.
 
@@ -33,7 +35,7 @@
 start_link(Config) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Config, []).
 
-%% @doc Called by bc_loop to deliver a completed response to the TUI.
+-doc "Called by bc_loop to deliver a completed response to the TUI.".
 -spec send_response(SessionId :: binary(), Msg :: #bc_message{}) -> ok.
 send_response(SessionId, Msg) ->
     gen_server:cast(?MODULE, {send_response, SessionId, Msg}).

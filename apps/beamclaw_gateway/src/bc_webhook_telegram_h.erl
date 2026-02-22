@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Telegram webhook handler — POST /webhook/telegram
 -module(bc_webhook_telegram_h).
+-moduledoc "Telegram webhook handler — POST /webhook/telegram".
 
 -export([init/2]).
 

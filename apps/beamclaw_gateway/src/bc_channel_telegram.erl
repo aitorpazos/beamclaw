@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc Telegram channel — long-poll or webhook mode.
-%% Implements bc_channel behaviour.
-%%
-%% bc_loop calls send_response/2 after each completed turn. The gen_server
-%% handles {send_response, ...} casts and sends the reply via Telegram API.
 -module(bc_channel_telegram).
+-moduledoc """
+Telegram channel — long-poll or webhook mode.
+Implements bc_channel behaviour.
+
+bc_loop calls send_response/2 after each completed turn. The gen_server
+handles {send_response, ...} casts and sends the reply via Telegram API.
+""".
 -behaviour(gen_server).
 %% Implements bc_channel callbacks.
 
@@ -33,12 +35,12 @@
 start_link(Config) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Config, []).
 
-%% @doc Called by bc_loop to deliver a completed response to the Telegram user.
+-doc "Called by bc_loop to deliver a completed response to the Telegram user.".
 -spec send_response(SessionId :: binary(), Msg :: #bc_message{}) -> ok.
 send_response(SessionId, Msg) ->
     gen_server:cast(?MODULE, {send_response, SessionId, Msg}).
 
-%% @doc Entry point for bc_webhook_telegram_h.
+-doc "Entry point for bc_webhook_telegram_h.".
 handle_webhook(Update) ->
     dispatch_telegram_message(Update).
 

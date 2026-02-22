@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc Mock LLM provider for smoke tests.
-%%
-%% stream/4 sends canned responses directly to CallerPid before returning,
-%% so bc_loop:receive_stream/2 finds them in the mailbox immediately.
-%% No HTTP calls, no external dependencies.
 -module(bc_provider_smoke_mock).
+-moduledoc """
+Mock LLM provider for smoke tests.
+
+stream/4 sends canned responses directly to CallerPid before returning,
+so bc_loop:receive_stream/2 finds them in the mailbox immediately.
+No HTTP calls, no external dependencies.
+""".
 -behaviour(bc_provider).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").

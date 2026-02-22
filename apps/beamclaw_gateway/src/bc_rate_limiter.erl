@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Sliding-window rate limiter — per client IP, ETS-backed, pruned every 60s.
 -module(bc_rate_limiter).
+-moduledoc "Sliding-window rate limiter — per client IP, ETS-backed, pruned every 60s.".
 -behaviour(gen_server).
 
 -export([start_link/0, check/2]).
@@ -30,7 +30,7 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Check if ClientId is within rate limit. Returns ok | {error, rate_limited}.
+-doc "Check if ClientId is within rate limit. Returns ok | {error, rate_limited}.".
 -spec check(ClientId :: term(), Path :: binary()) -> ok | {error, rate_limited}.
 check(ClientId, _Path) ->
     Now  = erlang:monotonic_time(millisecond),

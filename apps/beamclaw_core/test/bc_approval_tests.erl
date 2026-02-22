@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_approval decision logic.
-%%
-%% bc_obs:emit/2 casts to bc_obs_manager (named atom). If bc_obs_manager is
-%% not registered (as in a bare eunit run), OTP silently drops the cast.
-%% No observability infrastructure is needed for these tests.
 -module(bc_approval_tests).
+-moduledoc """
+EUnit tests for bc_approval decision logic.
+
+bc_obs:emit/2 casts to bc_obs_manager (named atom). If bc_obs_manager is
+not registered (as in a bare eunit run), OTP silently drops the cast.
+No observability infrastructure is needed for these tests.
+""".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

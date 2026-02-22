@@ -14,22 +14,24 @@
 %% limitations under the License.
 %%
 
-%% @doc Tool call parsing fallback chain.
-%%
-%% Tries in order:
-%%   1. OpenAI native tool_calls field (non-empty list)
-%%   2. XML tags: <tool_call>, <toolcall>, <invoke> with <name>/<args>
-%%   3. Markdown code block: ```json\n{"tool":"foo","args":{...}}\n```
-%%   4. Empty — return []
-%%
-%% Security: only match structured delimiters, never extract arbitrary JSON from free text.
 -module(bc_tool_parser).
+-moduledoc """
+Tool call parsing fallback chain.
+
+Tries in order:
+  1. OpenAI native tool_calls field (non-empty list)
+  2. XML tags: <tool_call>, <toolcall>, <invoke> with <name>/<args>
+  3. Markdown code block: ```json\n{"tool":"foo","args":{...}}\n```
+  4. Empty — return []
+
+Security: only match structured delimiters, never extract arbitrary JSON from free text.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([parse/1]).
 
-%% @doc Parse tool calls from a bc_message. Returns list of bc_tool_call records.
+-doc "Parse tool calls from a bc_message. Returns list of bc_tool_call records.".
 -spec parse(#bc_message{}) -> [#bc_tool_call{}].
 parse(#bc_message{tool_calls = [_ | _] = Calls}) ->
     %% 1. Native OpenAI tool_calls

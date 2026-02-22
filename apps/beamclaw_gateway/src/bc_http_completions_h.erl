@@ -14,17 +14,19 @@
 %% limitations under the License.
 %%
 
-%% @doc OpenAI-compatible chat completions handler — POST /v1/chat/completions
-%%
-%% Accepts OpenAI-format request bodies and dispatches to a BeamClaw session.
-%% Supports both:
-%%   - SSE streaming (stream: true):  text/event-stream with data: {...} events
-%%   - Synchronous (stream: false):   standard JSON response
-%%
-%% The handler registers itself as reply_pid in the bc_channel_message, so
-%% bc_loop sends {bc_chunk, SId, Chunk} and {bc_done, SId, Msg} directly here.
-%% Session ID is taken from the "session_id" field in the request, or generated.
 -module(bc_http_completions_h).
+-moduledoc """
+OpenAI-compatible chat completions handler — POST /v1/chat/completions
+
+Accepts OpenAI-format request bodies and dispatches to a BeamClaw session.
+Supports both:
+  - SSE streaming (stream: true):  text/event-stream with data: {...} events
+  - Synchronous (stream: false):   standard JSON response
+
+The handler registers itself as reply_pid in the bc_channel_message, so
+bc_loop sends {bc_chunk, SId, Chunk} and {bc_done, SId, Msg} directly here.
+Session ID is taken from the "session_id" field in the request, or generated.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 

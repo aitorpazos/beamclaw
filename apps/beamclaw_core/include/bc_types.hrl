@@ -14,7 +14,7 @@
 %% limitations under the License.
 %%
 
-%% @doc Shared record and type definitions for BeamClaw.
+%% Shared record and type definitions for BeamClaw.
 %%
 %% Include with: -include_lib("beamclaw_core/include/bc_types.hrl").
 

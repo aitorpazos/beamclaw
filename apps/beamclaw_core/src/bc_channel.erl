@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Channel behaviour — messaging platform abstraction.
-%%
-%% Channels receive messages from users and send responses back.
-%% Streaming uses update_draft/finalize_draft for progressive output.
 -module(bc_channel).
+-moduledoc """
+Channel behaviour — messaging platform abstraction.
+
+Channels receive messages from users and send responses back.
+Streaming uses update_draft/finalize_draft for progressive output.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 

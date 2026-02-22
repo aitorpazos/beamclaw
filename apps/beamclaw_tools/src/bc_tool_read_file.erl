@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in read_file tool — reads a file path and returns its content.
-%%
-%% Requires no approval and runs at read_only autonomy, allowing the agent to
-%% inspect files (documentation, configs, source) without an approval prompt.
 -module(bc_tool_read_file).
+-moduledoc """
+Built-in read_file tool — reads a file path and returns its content.
+
+Requires no approval and runs at read_only autonomy, allowing the agent to
+inspect files (documentation, configs, source) without an approval prompt.
+""".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

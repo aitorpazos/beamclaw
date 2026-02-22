@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Tool registry — named gen_server backed by ETS.
-%%
-%% Stores tool module → definition mappings.
-%% MCP-discovered tools are also registered here (source = mcp).
 -module(bc_tool_registry).
+-moduledoc """
+Tool registry — named gen_server backed by ETS.
+
+Stores tool module → definition mappings.
+MCP-discovered tools are also registered here (source = mcp).
+""".
 -behaviour(gen_server).
 
 -export([start_link/0, register/2, lookup/1, list/0]).
@@ -30,12 +32,12 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-%% @doc Register a tool module. Def is the result of Mod:definition().
+-doc "Register a tool module. Def is the result of Mod:definition().".
 -spec register(Mod :: module(), Def :: map()) -> ok.
 register(Mod, Def) ->
     gen_server:cast(?MODULE, {register, Mod, Def}).
 
-%% @doc Look up a tool by name. Returns {ok, {Mod, Def}} or {error, not_found}.
+-doc "Look up a tool by name. Returns {ok, {Mod, Def}} or {error, not_found}.".
 -spec lookup(Name :: binary()) -> {ok, {module(), map()}} | {error, not_found}.
 lookup(Name) ->
     case ets:lookup(?TAB, Name) of
@@ -43,7 +45,7 @@ lookup(Name) ->
         []                 -> {error, not_found}
     end.
 
-%% @doc List all registered tools.
+-doc "List all registered tools.".
 -spec list() -> [{binary(), module(), map()}].
 list() ->
     ets:tab2list(?TAB).

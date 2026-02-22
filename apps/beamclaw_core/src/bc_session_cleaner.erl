@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Periodic session cleanup — deletes expired stored sessions from Mnesia.
-%%
-%% Runs every `session_cleanup_interval_ms` (default: 5 minutes).
-%% Uses the `session_ttl_seconds` config key to determine expiry.
 -module(bc_session_cleaner).
+-moduledoc """
+Periodic session cleanup — deletes expired stored sessions from Mnesia.
+
+Runs every `session_cleanup_interval_ms` (default: 5 minutes).
+Uses the `session_ttl_seconds` config key to determine expiry.
+""".
 -behaviour(gen_server).
 
 -export([start_link/0]).

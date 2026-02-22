@@ -14,36 +14,40 @@
 %% limitations under the License.
 %%
 
-%% @doc Parser for SKILL.md files.
-%%
-%% SKILL.md format:
-%% ```
-%% ---
-%% name: example-skill
-%% description: One-line description
-%% homepage: https://example.com
-%% metadata: {"beamclaw": {"emoji": "...", "requires": {...}}}
-%% ---
-%%
-%% # Markdown content...
-%% ```
-%%
-%% Parsing: split on `---` delimiters, parse frontmatter as key: value lines,
-%% metadata value is JSON. Everything after second `---` is the content body.
 -module(bc_skill_parser).
+-moduledoc """
+Parser for SKILL.md files.
+
+SKILL.md format:
+```
+---
+name: example-skill
+description: One-line description
+homepage: https://example.com
+metadata: {"beamclaw": {"emoji": "...", "requires": {...}}}
+---
+
+# Markdown content...
+```
+
+Parsing: split on `---` delimiters, parse frontmatter as key: value lines,
+metadata value is JSON. Everything after second `---` is the content body.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([parse/2, parse/3]).
 
-%% @doc Parse a SKILL.md binary into a #bc_skill{} record.
-%% Source is `global` or `{agent, AgentId}`.
+-doc """
+Parse a SKILL.md binary into a #bc_skill{} record.
+Source is `global` or `{agent, AgentId}`.
+""".
 -spec parse(binary(), global | {agent, binary()}) ->
     {ok, #bc_skill{}} | {error, term()}.
 parse(Binary, Source) ->
     parse(Binary, Source, "").
 
-%% @doc Parse with an explicit filesystem path.
+-doc "Parse with an explicit filesystem path.".
 -spec parse(binary(), global | {agent, binary()}, string()) ->
     {ok, #bc_skill{}} | {error, term()}.
 parse(Binary, Source, Path) ->

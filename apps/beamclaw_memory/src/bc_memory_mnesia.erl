@@ -14,19 +14,21 @@
 %% limitations under the License.
 %%
 
-%% @doc Mnesia-backed memory backend. Persists across restarts via disc_copies
-%% (or ram_copies when no disc schema is present, e.g. in dev/test).
-%%
-%% A single global table `bc_memory_entries` is shared across all sessions.
-%% Per-session isolation is achieved via a composite {SessionId, UserKey}
-%% primary key, avoiding per-session table creation (dynamic atoms / schema
-%% changes are undesirable).
-%%
-%% State: #{session_id => binary()}
-%%
-%% All reads and writes use dirty operations for speed, matching the trade-off
-%% of the ETS backend. Upgrade to transactions if strict consistency is needed.
 -module(bc_memory_mnesia).
+-moduledoc """
+Mnesia-backed memory backend. Persists across restarts via disc_copies
+(or ram_copies when no disc schema is present, e.g. in dev/test).
+
+A single global table `bc_memory_entries` is shared across all sessions.
+Per-session isolation is achieved via a composite {SessionId, UserKey}
+primary key, avoiding per-session table creation (dynamic atoms / schema
+changes are undesirable).
+
+State: #{session_id => binary()}
+
+All reads and writes use dirty operations for speed, matching the trade-off
+of the ETS backend. Upgrade to transactions if strict consistency is needed.
+""".
 -behaviour(bc_memory).
 
 -include("bc_memory_mnesia.hrl").

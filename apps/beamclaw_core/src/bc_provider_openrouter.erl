@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc OpenRouter LLM provider stub.
 -module(bc_provider_openrouter).
+-moduledoc "OpenRouter LLM provider stub.".
 -behaviour(bc_provider).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").

@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in write_file tool — writes content to a file path (create or overwrite).
-%%
-%% Requires approval because it is a destructive operation (overwrites without
-%% confirmation). Runs at supervised autonomy minimum.
 -module(bc_tool_write_file).
+-moduledoc """
+Built-in write_file tool — writes content to a file path (create or overwrite).
+
+Requires approval because it is a destructive operation (overwrites without
+confirmation). Runs at supervised autonomy minimum.
+""".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

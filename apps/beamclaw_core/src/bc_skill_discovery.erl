@@ -14,21 +14,23 @@
 %% limitations under the License.
 %%
 
-%% @doc Skill discovery — scans filesystem for SKILL.md files.
-%%
-%% Discovery sources (lowest to highest precedence):
-%% 1. Bundled:   <app_priv>/skills/*/SKILL.md
-%% 2. Global:    ~/.beamclaw/skills/*/SKILL.md
-%% 3. Per-agent: ~/.beamclaw/agents/<agent-id>/skills/*/SKILL.md
-%%
-%% Per-agent skills override global/bundled skills with the same name.
 -module(bc_skill_discovery).
+-moduledoc """
+Skill discovery — scans filesystem for SKILL.md files.
+
+Discovery sources (lowest to highest precedence):
+1. Bundled:   <app_priv>/skills/*/SKILL.md
+2. Global:    ~/.beamclaw/skills/*/SKILL.md
+3. Per-agent: ~/.beamclaw/agents/<agent-id>/skills/*/SKILL.md
+
+Per-agent skills override global/bundled skills with the same name.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([discover/1, global_skills_dir/0, agent_skills_dir/1]).
 
-%% @doc Discover all skills for an agent. Per-agent overrides global by name.
+-doc "Discover all skills for an agent. Per-agent overrides global by name.".
 -spec discover(binary()) -> [#bc_skill{}].
 discover(AgentId) ->
     Bundled = scan_dir(bundled_skills_dir(), global),
@@ -37,7 +39,7 @@ discover(AgentId) ->
     %% Merge: later entries override earlier ones with the same name
     merge_skills(Bundled ++ Global ++ Agent).
 
-%% @doc Return the global skills directory.
+-doc "Return the global skills directory.".
 -spec global_skills_dir() -> string().
 global_skills_dir() ->
     case os:getenv("BEAMCLAW_HOME") of
@@ -48,7 +50,7 @@ global_skills_dir() ->
             filename:join([Dir, "skills"])
     end.
 
-%% @doc Return the per-agent skills directory.
+-doc "Return the per-agent skills directory.".
 -spec agent_skills_dir(binary()) -> string().
 agent_skills_dir(AgentId) ->
     case os:getenv("BEAMCLAW_HOME") of

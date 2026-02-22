@@ -14,26 +14,30 @@
 %% limitations under the License.
 %%
 
-%% @doc System prompt assembly from agent workspace bootstrap files.
-%%
-%% Reads the seven markdown files from the agent's workspace directory and
-%% converts them into system-role messages prepended to the conversation
-%% history before each LLM call. Also loads daily logs (today + yesterday)
-%% and eligible skill files. Assembled fresh every call so that MEMORY.md
-%% and daily log updates mid-session are picked up immediately.
 -module(bc_system_prompt).
+-moduledoc """
+System prompt assembly from agent workspace bootstrap files.
+
+Reads the seven markdown files from the agent's workspace directory and
+converts them into system-role messages prepended to the conversation
+history before each LLM call. Also loads daily logs (today + yesterday)
+and eligible skill files. Assembled fresh every call so that MEMORY.md
+and daily log updates mid-session are picked up immediately.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([assemble/1, assemble/2]).
 
-%% @doc Assemble system messages from an agent's bootstrap files.
-%% Returns messages in order:
-%%   IDENTITY → SOUL → USER → TOOLS → AGENTS → BOOTSTRAP → MEMORY
-%%   → memory/yesterday.md → memory/today.md
-%%   → skill messages (if skills config provided via assemble/2)
-%% Files that are missing or empty/whitespace-only are skipped.
-%% If the agent doesn't exist, returns a single fallback system message.
+-doc """
+Assemble system messages from an agent's bootstrap files.
+Returns messages in order:
+  IDENTITY → SOUL → USER → TOOLS → AGENTS → BOOTSTRAP → MEMORY
+  → memory/yesterday.md → memory/today.md
+  → skill messages (if skills config provided via assemble/2)
+Files that are missing or empty/whitespace-only are skipped.
+If the agent doesn't exist, returns a single fallback system message.
+""".
 -spec assemble(binary()) -> [#bc_message{}].
 assemble(AgentId) ->
     assemble(AgentId, #{}).
@@ -85,7 +89,7 @@ fallback_message() ->
         ts      = 0
     }.
 
-%% @doc Load today and yesterday daily logs as system messages.
+-doc "Load today and yesterday daily logs as system messages.".
 load_daily_logs(AgentId) ->
     Today = today_date(),
     Yesterday = yesterday_date(),
@@ -110,10 +114,12 @@ load_daily_logs(AgentId) ->
         end
     end, Dates).
 
-%% @doc Load eligible skills as system messages.
-%% Skills are represented as maps with keys: name, content, description, etc.
-%% This avoids a compile-time dependency on the #bc_skill{} record which lives
-%% in bc_types.hrl and may not be defined until M16.
+-doc """
+Load eligible skills as system messages.
+Skills are represented as maps with keys: name, content, description, etc.
+This avoids a compile-time dependency on the #bc_skill{} record which lives
+in bc_types.hrl and may not be defined until M16.
+""".
 load_skills(AgentId, Config) ->
     case code:ensure_loaded(bc_skill_discovery) of
         {module, _} ->

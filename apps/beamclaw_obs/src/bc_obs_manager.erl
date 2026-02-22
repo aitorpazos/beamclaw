@@ -14,10 +14,12 @@
 %% limitations under the License.
 %%
 
-%% @doc Observability fan-out manager.
-%%
-%% Receives cast events and forwards to all registered backends via pg process groups.
 -module(bc_obs_manager).
+-moduledoc """
+Observability fan-out manager.
+
+Receives cast events and forwards to all registered backends via pg process groups.
+""".
 -behaviour(gen_server).
 
 -export([start_link/0]).

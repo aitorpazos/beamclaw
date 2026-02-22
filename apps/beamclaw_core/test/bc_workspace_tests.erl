@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_workspace agent workspace management.
 -module(bc_workspace_tests).
+-moduledoc "EUnit tests for bc_workspace agent workspace management.".
 
 -include_lib("eunit/include/eunit.hrl").
 

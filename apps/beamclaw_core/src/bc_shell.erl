@@ -14,14 +14,16 @@
 %% limitations under the License.
 %%
 
-%% @doc Developer convenience module for interacting with BeamClaw from the
-%% Erlang REPL (rebar3 shell).  Not used in production; gateway channels handle
-%% production traffic.
-%%
-%% Usage from the shell:
-%%   bc_shell:chat("Hello, what can you do?").
-%%   bc_shell:chat(<<"my-session">>, "Continue our conversation.").
 -module(bc_shell).
+-moduledoc """
+Developer convenience module for interacting with BeamClaw from the
+Erlang REPL (rebar3 shell).  Not used in production; gateway channels handle
+production traffic.
+
+Usage from the shell:
+  bc_shell:chat("Hello, what can you do?").
+  bc_shell:chat(<<"my-session">>, "Continue our conversation.").
+""".
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([chat/1, chat/2]).

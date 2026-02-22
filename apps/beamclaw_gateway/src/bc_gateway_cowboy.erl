@@ -14,15 +14,17 @@
 %% limitations under the License.
 %%
 
-%% @doc Cowboy HTTP listener wrapper.
-%%
-%% Routes:
-%%   GET  /health                 → bc_http_health_h
-%%   GET  /metrics                → bc_http_metrics_h
-%%   POST /v1/chat/completions    → bc_http_completions_h
-%%   GET  /ws                     → bc_ws_h
-%%   POST /webhook/telegram       → bc_webhook_telegram_h
 -module(bc_gateway_cowboy).
+-moduledoc """
+Cowboy HTTP listener wrapper.
+
+Routes:
+  GET  /health                 → bc_http_health_h
+  GET  /metrics                → bc_http_metrics_h
+  POST /v1/chat/completions    → bc_http_completions_h
+  GET  /ws                     → bc_ws_h
+  POST /webhook/telegram       → bc_webhook_telegram_h
+""".
 
 -export([start_link/0]).
 

@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc WebSocket handler — GET /ws
-%%
-%% Each WebSocket connection gets a unique session. Messages are dispatched to
-%% bc_session with reply_pid = self(), so bc_loop sends {bc_chunk, SId, Chunk}
-%% and {bc_done, SId, Msg} directly to this handler process.
 -module(bc_ws_h).
+-moduledoc """
+WebSocket handler — GET /ws
+
+Each WebSocket connection gets a unique session. Messages are dispatched to
+bc_session with reply_pid = self(), so bc_loop sends {bc_chunk, SId, Chunk}
+and {bc_done, SId, Msg} directly to this handler process.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 

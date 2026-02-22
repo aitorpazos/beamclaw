@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Tests for bc_session_registry — derive_session_id/2,3 + isolation modes.
 -module(bc_session_registry_tests).
+-moduledoc "Tests for bc_session_registry — derive_session_id/2,3 + isolation modes.".
 
 -include_lib("eunit/include/eunit.hrl").
 

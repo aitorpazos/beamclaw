@@ -14,16 +14,18 @@
 %% limitations under the License.
 %%
 
-%% @doc Per-session approval workflow.
-%%
-%% Started transiently within bc_session_sup on first tool requiring approval.
-%% Decision logic:
-%%   1. Tool in session-scoped allowlist → auto-approve
-%%   2. autonomy_level =:= full → auto-approve
-%%   3. autonomy_level =:= read_only → deny immediately
-%%   4. Otherwise: send prompt to channel; wait for /yes, /no, /always
-%%      /always → add to allowlist; approve
 -module(bc_approval).
+-moduledoc """
+Per-session approval workflow.
+
+Started transiently within bc_session_sup on first tool requiring approval.
+Decision logic:
+  1. Tool in session-scoped allowlist → auto-approve
+  2. autonomy_level =:= full → auto-approve
+  3. autonomy_level =:= read_only → deny immediately
+  4. Otherwise: send prompt to channel; wait for /yes, /no, /always
+     /always → add to allowlist; approve
+""".
 -behaviour(gen_server).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
@@ -43,7 +45,7 @@
 start_link(Config) ->
     gen_server:start_link(?MODULE, Config, []).
 
-%% @doc Request approval for a tool call. Returns approved | denied.
+-doc "Request approval for a tool call. Returns approved | denied.".
 -spec request(Pid :: pid(), ToolCall :: #bc_tool_call{}, Autonomy :: autonomy_level()) ->
     approved | denied.
 request(Pid, ToolCall, Autonomy) ->

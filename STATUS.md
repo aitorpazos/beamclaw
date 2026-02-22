@@ -317,6 +317,17 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | EUnit test | ✅ | 8 tests (bc_session_registry_tests); canonical cross-channel test added |
 | Docs update | ✅ | running.md, configuration.md, CLAUDE.md |
 
+### Post-M19 — Migrate `%% @doc` to EEP-59 `-doc`/`-moduledoc` ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Erlang escript migration tool | ✅ | One-time tool; handles single/multi-line, module/function-level |
+| 70 `.erl` files migrated | ✅ | All 7 apps + test files; single-line → `-doc "...".`; multi-line/quoted → triple-quoted strings |
+| `bc_types.hrl` manual fix | ✅ | Header file `%% @doc` → plain `%%` comment (attributes invalid in `.hrl`) |
+| Zero remaining `%% @doc` | ✅ | Verified via grep |
+| Compilation clean | ✅ | 0 warnings |
+| All 180 tests pass | ✅ | No regressions |
+
 ---
 
 ## Known Issues / Blockers
@@ -327,4 +338,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (Post-M19: Cross-channel session sharing fix — 180 tests, 0 warnings)
+2026-02-22 (EEP-59 doc migration — 180 tests, 0 warnings)

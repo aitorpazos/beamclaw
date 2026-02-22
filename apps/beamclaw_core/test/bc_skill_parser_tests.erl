@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_skill_parser.
 -module(bc_skill_parser_tests).
+-moduledoc "EUnit tests for bc_skill_parser.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

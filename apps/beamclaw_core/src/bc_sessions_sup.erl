@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Dynamic supervisor for per-session supervisors.
 -module(bc_sessions_sup).
+-moduledoc "Dynamic supervisor for per-session supervisors.".
 -behaviour(supervisor).
 
 -export([start_link/0, start_session/1, init/1]).

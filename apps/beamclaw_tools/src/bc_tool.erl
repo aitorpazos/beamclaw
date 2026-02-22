@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Tool behaviour definition.
-%%
-%% All tool implementations must export these callbacks.
-%% Tools are registered in bc_tool_registry on startup.
 -module(bc_tool).
+-moduledoc """
+Tool behaviour definition.
+
+All tool implementations must export these callbacks.
+Tools are registered in bc_tool_registry on startup.
+""".
 
 -type autonomy_level() :: read_only | supervised | full.
 -export_type([autonomy_level/0]).

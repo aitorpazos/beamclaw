@@ -14,14 +14,16 @@
 %% limitations under the License.
 %%
 
-%% @doc Per-session supervisor.
-%%
-%% Children:
-%%   bc_session  — permanent (the "lane"; holds history across loop crashes)
-%%   bc_loop     — transient (gen_statem; can crash and be restarted safely)
-%%
-%% Provider and bc_approval are started on demand by bc_session.
 -module(bc_session_sup).
+-moduledoc """
+Per-session supervisor.
+
+Children:
+  bc_session  — permanent (the "lane"; holds history across loop crashes)
+  bc_loop     — transient (gen_statem; can crash and be restarted safely)
+
+Provider and bc_approval are started on demand by bc_session.
+""".
 -behaviour(supervisor).
 
 -export([start_link/1, init/1]).

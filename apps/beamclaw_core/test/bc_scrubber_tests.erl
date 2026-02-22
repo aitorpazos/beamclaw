@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_scrubber credential redaction.
 -module(bc_scrubber_tests).
+-moduledoc "EUnit tests for bc_scrubber credential redaction.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

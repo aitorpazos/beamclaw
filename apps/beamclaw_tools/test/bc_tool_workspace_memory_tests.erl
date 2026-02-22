@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_tool_workspace_memory.
 -module(bc_tool_workspace_memory_tests).
+-moduledoc "EUnit tests for bc_tool_workspace_memory.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

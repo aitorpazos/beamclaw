@@ -14,20 +14,22 @@
 %% limitations under the License.
 %%
 
-%% @doc End-to-end smoke test: TUI channel — M7 final task.
-%%
-%% Exercises the full agentic loop without HTTP:
-%%   session creation → message dispatch → bc_loop streaming → history update.
-%%
-%% bc_provider_smoke_mock:stream/4 sends canned messages directly to the
-%% caller PID before returning, so receive_stream/2 finds them in the mailbox
-%% immediately — no timing dependency on a real HTTP stream.
-%%
-%% beamclaw_gateway is NOT started, avoiding the TUI stdin reader.
-%%
-%% Startup race: dispatch_run may arrive before bc_loop announces its PID via
-%% set_loop_pid. bc_session queues it and drains on set_loop_pid — safe.
 -module(bc_smoke_tests).
+-moduledoc """
+End-to-end smoke test: TUI channel — M7 final task.
+
+Exercises the full agentic loop without HTTP:
+  session creation → message dispatch → bc_loop streaming → history update.
+
+bc_provider_smoke_mock:stream/4 sends canned messages directly to the
+caller PID before returning, so receive_stream/2 finds them in the mailbox
+immediately — no timing dependency on a real HTTP stream.
+
+beamclaw_gateway is NOT started, avoiding the TUI stdin reader.
+
+Startup race: dispatch_run may arrive before bc_loop announces its PID via
+set_loop_pid. bc_session queues it and drains on set_loop_pid — safe.
+""".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

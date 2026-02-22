@@ -14,13 +14,15 @@
 %% limitations under the License.
 %%
 
-%% @doc MCP tool registry — maps tool_name → {server_pid, server_name}.
-%%
-%% When a bc_mcp_server discovers tools via tools/list, it calls
-%% register_tools/3 here. Each server PID is monitored; when the process
-%% dies (e.g. port crash before restart), its ETS entries are cleaned up
-%% automatically so stale tool→pid mappings do not accumulate.
 -module(bc_mcp_registry).
+-moduledoc """
+MCP tool registry — maps tool_name → {server_pid, server_name}.
+
+When a bc_mcp_server discovers tools via tools/list, it calls
+register_tools/3 here. Each server PID is monitored; when the process
+dies (e.g. port crash before restart), its ETS entries are cleaned up
+automatically so stale tool→pid mappings do not accumulate.
+""".
 -behaviour(gen_server).
 
 -export([start_link/0, register_tools/3, lookup/1, unregister_server/1]).

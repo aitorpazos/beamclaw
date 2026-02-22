@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Credential scrubbing.
-%%
-%% Applied to every tool result before it enters history or is sent to the LLM.
-%% Uses regex patterns to redact known credential formats.
 -module(bc_scrubber).
+-moduledoc """
+Credential scrubbing.
+
+Applied to every tool result before it enters history or is sent to the LLM.
+Uses regex patterns to redact known credential formats.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
@@ -41,7 +43,7 @@
     "AKIA[0-9A-Z]{16}"
 ]).
 
-%% @doc Scrub a binary string.
+-doc "Scrub a binary string.".
 -spec scrub(binary()) -> binary().
 scrub(Text) when is_binary(Text) ->
     lists:foldl(fun(Pattern, Acc) ->
@@ -51,14 +53,14 @@ scrub(Text) when is_binary(Text) ->
 scrub(Other) ->
     Other.
 
-%% @doc Scrub the content field of a bc_message.
+-doc "Scrub the content field of a bc_message.".
 -spec scrub_message(#bc_message{}) -> #bc_message{}.
 scrub_message(#bc_message{content = Content} = Msg) when is_binary(Content) ->
     Msg#bc_message{content = scrub(Content)};
 scrub_message(Msg) ->
     Msg.
 
-%% @doc Scrub the content field of a bc_tool_result.
+-doc "Scrub the content field of a bc_tool_result.".
 -spec scrub_result(#bc_tool_result{}) -> #bc_tool_result{}.
 scrub_result(#bc_tool_result{content = Content} = Result) ->
     Result#bc_tool_result{content = scrub(Content)}.

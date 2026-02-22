@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc OpenAI LLM provider stub.
 -module(bc_provider_openai).
+-moduledoc "OpenAI LLM provider stub.".
 -behaviour(bc_provider).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").

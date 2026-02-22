@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in curl tool — makes HTTP requests.
 -module(bc_tool_curl).
+-moduledoc "Built-in curl tool — makes HTTP requests.".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

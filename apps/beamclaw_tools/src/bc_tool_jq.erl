@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in jq tool — runs jq filter on JSON input.
 -module(bc_tool_jq).
+-moduledoc "Built-in jq tool — runs jq filter on JSON input.".
 -behaviour(bc_tool).
 
 -export([definition/0, execute/3, requires_approval/0, min_autonomy/0]).

@@ -14,22 +14,24 @@
 %% limitations under the License.
 %%
 
-%% @doc Skill eligibility checking.
-%%
-%% Checks whether a skill's requirements are met on the current system.
-%% Requirements are specified in metadata.beamclaw.requires:
-%%   - bins:  list of binary names that must exist on PATH
-%%   - env:   list of environment variable names that must be set
-%%   - os:    list of OS names (e.g. ["linux", "darwin"])
-%%
-%% If metadata.beamclaw.always =:= true, skip all checks.
 -module(bc_skill_eligibility).
+-moduledoc """
+Skill eligibility checking.
+
+Checks whether a skill's requirements are met on the current system.
+Requirements are specified in metadata.beamclaw.requires:
+  - bins:  list of binary names that must exist on PATH
+  - env:   list of environment variable names that must be set
+  - os:    list of OS names (e.g. ["linux", "darwin"])
+
+If metadata.beamclaw.always =:= true, skip all checks.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 
 -export([is_eligible/1, check/1]).
 
-%% @doc Check if a skill is eligible (all requirements met).
+-doc "Check if a skill is eligible (all requirements met).".
 -spec is_eligible(#bc_skill{}) -> boolean().
 is_eligible(Skill) ->
     case check(Skill) of
@@ -37,7 +39,7 @@ is_eligible(Skill) ->
         _  -> false
     end.
 
-%% @doc Check requirements. Returns ok or {missing, Details}.
+-doc "Check requirements. Returns ok or {missing, Details}.".
 -spec check(#bc_skill{}) ->
     ok | {missing, #{bins => [binary()], env => [binary()], os => [binary()]}}.
 check(#bc_skill{metadata = Metadata}) ->

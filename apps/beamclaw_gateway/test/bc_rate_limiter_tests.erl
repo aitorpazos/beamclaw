@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_rate_limiter sliding-window rate limiting.
 -module(bc_rate_limiter_tests).
+-moduledoc "EUnit tests for bc_rate_limiter sliding-window rate limiting.".
 
 -include_lib("eunit/include/eunit.hrl").
 

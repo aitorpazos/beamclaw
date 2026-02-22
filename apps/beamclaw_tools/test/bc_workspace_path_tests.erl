@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_workspace_path.
 -module(bc_workspace_path_tests).
+-moduledoc "EUnit tests for bc_workspace_path.".
 
 -include_lib("eunit/include/eunit.hrl").
 

@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Prometheus metrics scrape handler — GET /metrics
 -module(bc_http_metrics_h).
+-moduledoc "Prometheus metrics scrape handler — GET /metrics".
 
 -export([init/2]).
 

@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc Log observability backend. Implements the bc_observer behaviour.
-%%
-%% Emits one structured log line per event via OTP logger.
-%% Log level filtering is controlled by the operator via the kernel app's
-%% logger config in sys.config — no level field is stored in state.
 -module(bc_obs_log).
+-moduledoc """
+Log observability backend. Implements the bc_observer behaviour.
+
+Emits one structured log line per event via OTP logger.
+Log level filtering is controlled by the operator via the kernel app's
+logger config in sys.config — no level field is stored in state.
+""".
 -behaviour(gen_server).
 %% Implements bc_observer backend callbacks (handle_event/2).
 

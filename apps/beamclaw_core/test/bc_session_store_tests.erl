@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Tests for bc_session_store — Mnesia-backed session persistence.
 -module(bc_session_store_tests).
+-moduledoc "Tests for bc_session_store — Mnesia-backed session persistence.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

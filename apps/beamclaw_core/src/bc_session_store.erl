@@ -14,17 +14,19 @@
 %% limitations under the License.
 %%
 
-%% @doc Session persistence — Mnesia-backed data access layer.
-%%
-%% Stores session state (history, user/agent IDs, config) in the bc_session_stored
-%% Mnesia table. History is serialized via term_to_binary with a version tag
-%% (currently version 1) for forward compatibility.
-%%
-%% Storage type: disc_copies when a disc schema exists (production), ram_copies
-%% otherwise (dev/test). Same pattern as bc_memory_mnesia.
-%%
-%% All reads/writes use dirty operations for speed.
 -module(bc_session_store).
+-moduledoc """
+Session persistence — Mnesia-backed data access layer.
+
+Stores session state (history, user/agent IDs, config) in the bc_session_stored
+Mnesia table. History is serialized via term_to_binary with a version tag
+(currently version 1) for forward compatibility.
+
+Storage type: disc_copies when a disc schema exists (production), ram_copies
+otherwise (dev/test). Same pattern as bc_memory_mnesia.
+
+All reads/writes use dirty operations for speed.
+""".
 
 -include_lib("beamclaw_core/include/bc_session_store.hrl").
 

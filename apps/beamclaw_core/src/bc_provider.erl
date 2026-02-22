@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc LLM provider behaviour.
-%%
-%% All provider implementations must export these callbacks.
-%% Providers run as gen_servers (bc_provider_openrouter, bc_provider_openai)
-%% started transiently within each bc_session_sup.
 -module(bc_provider).
+-moduledoc """
+LLM provider behaviour.
+
+All provider implementations must export these callbacks.
+Providers run as gen_servers (bc_provider_openrouter, bc_provider_openai)
+started transiently within each bc_session_sup.
+""".
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
 

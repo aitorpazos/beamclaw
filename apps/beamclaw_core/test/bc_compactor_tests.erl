@@ -14,12 +14,14 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_compactor context compaction.
-%%
-%% These tests cover the no-op path (history shorter than or equal to target).
-%% The LLM-failure fallback path requires a live HTTP endpoint; it is covered
-%% by integration/smoke tests rather than unit tests.
 -module(bc_compactor_tests).
+-moduledoc """
+EUnit tests for bc_compactor context compaction.
+
+These tests cover the no-op path (history shorter than or equal to target).
+The LLM-failure fallback path requires a live HTTP endpoint; it is covered
+by integration/smoke tests rather than unit tests.
+""".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

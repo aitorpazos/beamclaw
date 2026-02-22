@@ -14,13 +14,15 @@
 %% limitations under the License.
 %%
 
-%% @doc BeamClaw CLI entry point (escript).
-%%
-%% Usage: beamclaw [tui|start|stop|restart|remote_console|agent|skills|doctor|status|version|help]
-%%
-%% Built with: rebar3 escriptize
-%% Output:     _build/default/bin/beamclaw
 -module(beamclaw_cli).
+-moduledoc """
+BeamClaw CLI entry point (escript).
+
+Usage: beamclaw [tui|start|stop|restart|remote_console|agent|skills|doctor|status|version|help]
+
+Built with: rebar3 escriptize
+Output:     _build/default/bin/beamclaw
+""".
 -export([main/1]).
 
 %% All CLI command functions terminate via halt/1 (escript pattern).
@@ -80,14 +82,14 @@ main([Unknown                   | _]) ->
 %% Commands
 %%--------------------------------------------------------------------
 
-%% @doc Start interactive TUI chat — auto-detects running daemon.
+-doc "Start interactive TUI chat — auto-detects running daemon.".
 cmd_tui(AgentId) ->
     case try_connect_daemon() of
         connected   -> cmd_remote_tui(AgentId);
         not_running -> cmd_local_tui(AgentId)
     end.
 
-%% @doc Start the TUI in-process (no daemon running).
+-doc "Start the TUI in-process (no daemon running).".
 cmd_local_tui(AgentId) ->
     apply_tui_config(),
     application:set_env(beamclaw_core, default_agent, AgentId,
@@ -112,7 +114,7 @@ cmd_local_tui(AgentId) ->
             end
     end.
 
-%% @doc Attach a remote TUI to a running daemon via Erlang distribution.
+-doc "Attach a remote TUI to a running daemon via Erlang distribution.".
 cmd_remote_tui(AgentId) ->
     erlang:monitor_node(daemon_node(), true),
     UserId = cli_user_id(),
@@ -218,7 +220,7 @@ receive_remote_response(SessionId) ->
         io:format("~n[timeout — no response within 120s]~n> ")
     end.
 
-%% @doc Start gateway as a background daemon (Erlang distribution IPC).
+-doc "Start gateway as a background daemon (Erlang distribution IPC).".
 cmd_start() ->
     ensure_ctl_node(),
     case net_adm:ping(daemon_node()) of
@@ -229,7 +231,7 @@ cmd_start() ->
             spawn_daemon()
     end.
 
-%% @doc Stop a running daemon via OTP RPC.
+-doc "Stop a running daemon via OTP RPC.".
 cmd_stop() ->
     ensure_ctl_node(),
     case do_stop() of
@@ -245,7 +247,7 @@ cmd_stop() ->
             halt(1)
     end.
 
-%% @doc Stop then start the daemon.
+-doc "Stop then start the daemon.".
 cmd_restart() ->
     ensure_ctl_node(),
     case do_stop() of
@@ -258,7 +260,7 @@ cmd_restart() ->
     end,
     spawn_daemon().
 
-%% @doc Print the erl -remsh command to attach a live shell to the daemon.
+-doc "Print the erl -remsh command to attach a live shell to the daemon.".
 cmd_remote_console() ->
     ensure_ctl_node(),
     case net_adm:ping(daemon_node()) of
@@ -272,7 +274,7 @@ cmd_remote_console() ->
             halt(0)
     end.
 
-%% @doc Check environment and connectivity. Exits 0 if no failures, 1 otherwise.
+-doc "Check environment and connectivity. Exits 0 if no failures, 1 otherwise.".
 cmd_doctor() ->
     Checks = [
         check_otp_version(),
@@ -293,7 +295,7 @@ cmd_doctor() ->
         false -> halt(0)
     end.
 
-%% @doc Ping the running gateway's /health endpoint.
+-doc "Ping the running gateway's /health endpoint.".
 cmd_status() ->
     application:ensure_all_started(inets),
     Port = case os:getenv("BEAMCLAW_PORT") of
@@ -320,7 +322,7 @@ cmd_status() ->
 cmd_version() ->
     io:format("beamclaw ~s~n", [?VERSION]).
 
-%% @doc Create a new agent workspace.
+-doc "Create a new agent workspace.".
 cmd_agent_create(Name) ->
     case bc_workspace:create_agent(Name) of
         ok ->
@@ -337,7 +339,7 @@ cmd_agent_create(Name) ->
             halt(1)
     end.
 
-%% @doc List all agents.
+-doc "List all agents.".
 cmd_agent_list() ->
     bc_workspace:ensure_default_agent(),
     Agents = bc_workspace:list_agents(),
@@ -353,7 +355,7 @@ cmd_agent_list() ->
     end,
     halt(0).
 
-%% @doc Delete an agent workspace.
+-doc "Delete an agent workspace.".
 cmd_agent_delete(Name) ->
     case bc_workspace:delete_agent(Name) of
         ok ->
@@ -373,7 +375,7 @@ cmd_agent_delete(Name) ->
             halt(1)
     end.
 
-%% @doc Show all bootstrap files for an agent.
+-doc "Show all bootstrap files for an agent.".
 cmd_agent_show(Name) ->
     case bc_workspace:agent_exists(Name) of
         false ->
@@ -395,7 +397,7 @@ cmd_agent_show(Name) ->
             halt(0)
     end.
 
-%% @doc Factory reset an agent: restore all files to defaults, wipe daily logs.
+-doc "Factory reset an agent: restore all files to defaults, wipe daily logs.".
 cmd_agent_rehatch(Name) ->
     case bc_workspace:rehatch_agent(Name) of
         ok ->
@@ -411,7 +413,7 @@ cmd_agent_rehatch(Name) ->
             halt(1)
     end.
 
-%% @doc List all discovered skills with eligible status.
+-doc "List all discovered skills with eligible status.".
 cmd_skills_list() ->
     AgentId = default_agent(),
     Skills = bc_skill_discovery:discover(AgentId),
@@ -447,7 +449,7 @@ cmd_skills_list() ->
     end,
     halt(0).
 
-%% @doc Show detailed requirements status for all skills.
+-doc "Show detailed requirements status for all skills.".
 cmd_skills_status() ->
     AgentId = default_agent(),
     Skills = bc_skill_discovery:discover(AgentId),
@@ -491,7 +493,7 @@ cmd_skills_status() ->
     end,
     halt(0).
 
-%% @doc Show a specific skill's SKILL.md content.
+-doc "Show a specific skill's SKILL.md content.".
 cmd_skills_show(Name) ->
     AgentId = default_agent(),
     Skills = bc_skill_discovery:discover(AgentId),
@@ -511,7 +513,7 @@ cmd_skills_show(Name) ->
             halt(0)
     end.
 
-%% @doc Install a skill's dependencies.
+-doc "Install a skill's dependencies.".
 cmd_skills_install(Name) ->
     AgentId = default_agent(),
     Skills = bc_skill_discovery:discover(AgentId),
@@ -579,14 +581,14 @@ cmd_help() ->
 %% Internal: agent helpers
 %%--------------------------------------------------------------------
 
-%% @doc Resolve default agent from BEAMCLAW_AGENT env var or fallback.
+-doc "Resolve default agent from BEAMCLAW_AGENT env var or fallback.".
 default_agent() ->
     case os:getenv("BEAMCLAW_AGENT") of
         false -> <<"default">>;
         Name  -> list_to_binary(Name)
     end.
 
-%% @doc Extract the Name field from IDENTITY.md for display, if present.
+-doc "Extract the Name field from IDENTITY.md for display, if present.".
 agent_display_name(AgentId) ->
     case bc_workspace:read_bootstrap_file(AgentId, <<"IDENTITY.md">>) of
         {ok, Content} ->
@@ -676,7 +678,7 @@ ensure_ctl_node_soft() ->
         {error, Reason}               -> {error, Reason}
     end.
 
-%% @doc Derive user_id for CLI/remote TUI from BEAMCLAW_USER / USER env vars.
+-doc "Derive user_id for CLI/remote TUI from BEAMCLAW_USER / USER env vars.".
 cli_user_id() ->
     case bc_config:canonical_user_id() of
         undefined ->

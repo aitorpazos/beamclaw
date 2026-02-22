@@ -14,13 +14,15 @@
 %% limitations under the License.
 %%
 
-%% @doc Session registry — named gen_server, ETS: session_id → pid.
-%%
-%% register/2 uses gen_server:call so the ETS insert is guaranteed complete
-%% before the caller returns. This eliminates the timer:sleep race condition
-%% that would arise if channels tried to look up a session immediately after
-%% start_session/1 returned.
 -module(bc_session_registry).
+-moduledoc """
+Session registry — named gen_server, ETS: session_id → pid.
+
+register/2 uses gen_server:call so the ETS insert is guaranteed complete
+before the caller returns. This eliminates the timer:sleep race condition
+that would arise if channels tried to look up a session immediately after
+start_session/1 returned.
+""".
 -behaviour(gen_server).
 
 -export([start_link/0, register/2, lookup/1, unregister/1, all/0]).
@@ -52,10 +54,12 @@ unregister(SessionId) ->
 all() ->
     ets:tab2list(?TAB).
 
-%% @doc Derive a deterministic session ID from user_id and agent_id.
-%% Same user + same agent = same session_id regardless of channel.
-%% Dialyzer infers a narrower return type (<<_:64,_:_*8>>); binary() is correct
-%% for the public API spec. Same pattern as bc_skill_parser, bc_system_prompt etc.
+-doc """
+Derive a deterministic session ID from user_id and agent_id.
+Same user + same agent = same session_id regardless of channel.
+Dialyzer infers a narrower return type (<<_:64,_:_*8>>); binary() is correct
+for the public API spec. Same pattern as bc_skill_parser, bc_system_prompt etc.
+""".
 -dialyzer({nowarn_function, [derive_session_id/2, derive_session_id/3]}).
 -spec derive_session_id(UserId :: binary(), AgentId :: binary()) -> binary().
 derive_session_id(UserId, AgentId) ->
@@ -64,9 +68,11 @@ derive_session_id(UserId, AgentId) ->
     Hex = binary:encode_hex(binary:part(Hash, 0, 16), lowercase),
     <<"session-", Hex/binary>>.
 
-%% @doc Derive session ID with optional channel isolation.
-%% When session_sharing is `per_channel`, the channel atom is included in the
-%% hash input, producing different session IDs per channel.
+-doc """
+Derive session ID with optional channel isolation.
+When session_sharing is `per_channel`, the channel atom is included in the
+hash input, producing different session IDs per channel.
+""".
 -spec derive_session_id(UserId :: binary(), AgentId :: binary(),
                         Channel :: atom()) -> binary().
 derive_session_id(UserId, AgentId, Channel) ->

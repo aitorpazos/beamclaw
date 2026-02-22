@@ -14,21 +14,23 @@
 %% limitations under the License.
 %%
 
-%% @doc MCP server connection manager.
-%%
-%% Owns an erlang:open_port for stdio-based MCP servers.
-%% Implements JSON-RPC 2.0 protocol for MCP.
-%%
-%% Startup sequence:
-%%   1. open_port → connect to external MCP process via stdio
-%%   2. Send initialize RPC (id=1)
-%%   3. On initialize response: send notifications/initialized notification
-%%      then send tools/list RPC
-%%   4. On tools/list response: register tools in bc_mcp_registry
-%%
-%% On port crash: supervisor restarts the gen_server; handshake repeats,
-%% tools are rediscovered and re-registered.
 -module(bc_mcp_server).
+-moduledoc """
+MCP server connection manager.
+
+Owns an erlang:open_port for stdio-based MCP servers.
+Implements JSON-RPC 2.0 protocol for MCP.
+
+Startup sequence:
+  1. open_port → connect to external MCP process via stdio
+  2. Send initialize RPC (id=1)
+  3. On initialize response: send notifications/initialized notification
+     then send tools/list RPC
+  4. On tools/list response: register tools in bc_mcp_registry
+
+On port crash: supervisor restarts the gen_server; handshake repeats,
+tools are rediscovered and re-registered.
+""".
 -behaviour(gen_server).
 
 -export([start_link/1, call_tool/3]).
@@ -53,7 +55,7 @@
 start_link(Config) ->
     gen_server:start_link(?MODULE, Config, []).
 
-%% @doc Call a tool on this MCP server. Times out after 30 s.
+-doc "Call a tool on this MCP server. Times out after 30 s.".
 -spec call_tool(ServerPid :: pid(), ToolName :: binary(), Args :: map()) ->
     {ok, term()} | {error, term()}.
 call_tool(ServerPid, ToolName, Args) ->

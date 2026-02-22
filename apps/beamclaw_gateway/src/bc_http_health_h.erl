@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc Health check handler — GET /health
 -module(bc_http_health_h).
+-moduledoc "Health check handler — GET /health".
 
 -export([init/2]).
 

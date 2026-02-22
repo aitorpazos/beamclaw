@@ -14,13 +14,15 @@
 %% limitations under the License.
 %%
 
-%% @doc ETS-backed memory backend. In-memory, per-session, lost on restart.
-%%
-%% State: #{tab => ets:tid(), session_id => binary()}
-%%
-%% Each session gets its own private ETS table. The table is lost when the
-%% owning process (bc_session) terminates. Use bc_memory_sqlite for persistence.
 -module(bc_memory_ets).
+-moduledoc """
+ETS-backed memory backend. In-memory, per-session, lost on restart.
+
+State: #{tab => ets:tid(), session_id => binary()}
+
+Each session gets its own private ETS table. The table is lost when the
+owning process (bc_session) terminates. Use bc_memory_sqlite for persistence.
+""".
 -behaviour(bc_memory).
 
 -export([init/2, store/4, recall/4, get/2, forget/2]).

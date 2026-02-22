@@ -14,21 +14,23 @@
 %% limitations under the License.
 %%
 
-%% @doc Agentic loop — gen_statem.
-%%
-%% States:
-%%   idle → compacting (optional) → streaming → awaiting_approval (optional)
-%%        → executing_tools → streaming (loop) → finalizing → idle
-%%
-%% bc_loop is transient. A crash is restarted by bc_session_sup.
-%% bc_session (permanent) retains history across restarts.
-%%
-%% Response routing (route_response/2):
-%%   - reply_pid set in bc_channel_message → send {bc_chunk, SId, Chunk} and
-%%     {bc_done, SId, Msg} directly to that pid (HTTP/WS handlers)
-%%   - reply_pid undefined → call ChannelMod:send_response(SId, Msg) on the
-%%     named channel gen_server (Telegram, TUI)
 -module(bc_loop).
+-moduledoc """
+Agentic loop — gen_statem.
+
+States:
+  idle → compacting (optional) → streaming → awaiting_approval (optional)
+       → executing_tools → streaming (loop) → finalizing → idle
+
+bc_loop is transient. A crash is restarted by bc_session_sup.
+bc_session (permanent) retains history across restarts.
+
+Response routing (route_response/2):
+  - reply_pid set in bc_channel_message → send {bc_chunk, SId, Chunk} and
+    {bc_done, SId, Msg} directly to that pid (HTTP/WS handlers)
+  - reply_pid undefined → call ChannelMod:send_response(SId, Msg) on the
+    named channel gen_server (Telegram, TUI)
+""".
 -behaviour(gen_statem).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").

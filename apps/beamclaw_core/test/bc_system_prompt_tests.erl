@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_system_prompt assembly.
 -module(bc_system_prompt_tests).
+-moduledoc "EUnit tests for bc_system_prompt assembly.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

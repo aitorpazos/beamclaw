@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Memory behaviour definition.
-%%
-%% All memory backends must implement these callbacks.
-%% See bc_memory_ets and bc_memory_mnesia for reference implementations.
 -module(bc_memory).
+-moduledoc """
+Memory behaviour definition.
+
+All memory backends must implement these callbacks.
+See bc_memory_ets and bc_memory_mnesia for reference implementations.
+""".
 
 -type memory_category() :: core | daily | conversation | custom.
 -export_type([memory_category/0]).

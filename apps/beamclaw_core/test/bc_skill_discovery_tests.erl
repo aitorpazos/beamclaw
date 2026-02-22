@@ -14,8 +14,8 @@
 %% limitations under the License.
 %%
 
-%% @doc EUnit tests for bc_skill_discovery.
 -module(bc_skill_discovery_tests).
+-moduledoc "EUnit tests for bc_skill_discovery.".
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("beamclaw_core/include/bc_types.hrl").

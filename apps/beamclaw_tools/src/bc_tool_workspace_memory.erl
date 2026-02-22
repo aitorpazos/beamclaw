@@ -14,20 +14,22 @@
 %% limitations under the License.
 %%
 
-%% @doc Built-in workspace_memory tool — read/append/replace MEMORY.md and daily logs.
-%%
-%% Allows the agent to manage its own long-term memory file and daily logs.
-%% The path is constructed internally from the agent_id in bc_session_ref,
-%% so no path traversal is possible.
-%%
-%% Actions:
-%%   - read:         Return current MEMORY.md content
-%%   - append:       Append text to MEMORY.md
-%%   - replace:      Replace entire MEMORY.md content
-%%   - read_daily:   Read today's daily log (or specific date)
-%%   - append_daily: Append text to today's daily log
-%%   - list_daily:   List available daily log files
 -module(bc_tool_workspace_memory).
+-moduledoc """
+Built-in workspace_memory tool — read/append/replace MEMORY.md and daily logs.
+
+Allows the agent to manage its own long-term memory file and daily logs.
+The path is constructed internally from the agent_id in bc_session_ref,
+so no path traversal is possible.
+
+Actions:
+  - read:         Return current MEMORY.md content
+  - append:       Append text to MEMORY.md
+  - replace:      Replace entire MEMORY.md content
+  - read_daily:   Read today's daily log (or specific date)
+  - append_daily: Append text to today's daily log
+  - list_daily:   List available daily log files
+""".
 -behaviour(bc_tool).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").

@@ -14,11 +14,13 @@
 %% limitations under the License.
 %%
 
-%% @doc Default bootstrap file templates for agent workspaces.
-%%
-%% Pure data module. Each template provides the initial content for one of
-%% the seven markdown files in an agent workspace directory.
 -module(bc_workspace_templates).
+-moduledoc """
+Default bootstrap file templates for agent workspaces.
+
+Pure data module. Each template provides the initial content for one of
+the seven markdown files in an agent workspace directory.
+""".
 
 -export([template/1, all_templates/0]).
 
@@ -26,7 +28,7 @@
 %% all_templates/0; the spec uses binary() for API clarity.
 -dialyzer({nowarn_function, [all_templates/0]}).
 
-%% @doc Return the default content for a given bootstrap filename.
+-doc "Return the default content for a given bootstrap filename.".
 -spec template(binary()) -> binary().
 template(<<"SOUL.md">>) ->
     <<"# Soul\n\n"
@@ -196,7 +198,7 @@ template(<<"BOOTSTRAP.md">>) ->
 template(_) ->
     <<>>.
 
-%% @doc Return all template filenames with their default content.
+-doc "Return all template filenames with their default content.".
 -spec all_templates() -> [{binary(), binary()}].
 all_templates() ->
     Files = [<<"SOUL.md">>, <<"IDENTITY.md">>, <<"USER.md">>,
