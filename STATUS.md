@@ -360,6 +360,17 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `bc_gateway_cowboy.erl` gen_server wrap | ✅ | Proper gen_server; `terminate/2` calls `cowboy:stop_listener/1`; supervisor owns our pid, not Ranch's |
 | `beamclaw_gateway_app.erl` `prep_stop/1` removed | ✅ | No longer needed; gen_server terminate handles cleanup |
 
+### Post-M20 — Default Port Change (8080 → 18800) + BEAMCLAW_PORT ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `sys.config` port update | ✅ | `#{port => 8080}` → `#{port => 18800}` |
+| `sys.docker.config` port update | ✅ | Same change |
+| `bc_gateway_cowboy.erl` env var | ✅ | Resolves `BEAMCLAW_PORT` at startup; falls back to config |
+| `beamclaw_cli.erl` macro + TUI config | ✅ | `?GATEWAY_PORT` → 18800; `apply_tui_config` resolves `BEAMCLAW_PORT` |
+| `Dockerfile` update | ✅ | `EXPOSE 18800`; healthcheck URL updated |
+| Docs update | ✅ | README, running.md, configuration.md, CLAUDE.md |
+
 ---
 
 ## Known Issues / Blockers

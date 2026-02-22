@@ -501,7 +501,7 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
     {servers, []}
 ]},
 {beamclaw_gateway, [
-    {http, #{port => 8080}},
+    {http, #{port => 18800}},
     {channels, [
         {telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"}, mode => long_poll,
                      dm_policy => pairing, allow_from => []}},

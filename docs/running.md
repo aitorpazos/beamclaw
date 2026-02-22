@@ -293,7 +293,7 @@ Pairing data is stored as JSON files under `~/.beamclaw/pairing/`:
 | `OPENROUTER_API_KEY` | Yes | LLM completions via OpenRouter |
 | `OPENAI_API_KEY` | No | Alternative OpenAI provider |
 | `TELEGRAM_BOT_TOKEN` | No | Enable Telegram channel |
-| `BEAMCLAW_PORT` | No | Override gateway HTTP port (default: 8080) |
+| `BEAMCLAW_PORT` | No | Override gateway HTTP port (default: 18800) |
 | `BEAMCLAW_AGENT` | No | Default agent name for TUI (default: `default`) |
 | `BEAMCLAW_USER` | No | Override user identity for session sharing |
 | `BEAMCLAW_HOME` | No | Override workspace base directory (default: `~/.beamclaw`) |
@@ -374,14 +374,14 @@ docker run -d \
   --restart unless-stopped \
   -e OPENROUTER_API_KEY=sk-or-... \
   -e TELEGRAM_BOT_TOKEN=...       \
-  -p 8080:8080                    \
+  -p 18800:18800                    \
   beamclaw:latest
 ```
 
 ### Health check
 
 ```bash
-wget -qO- http://localhost:8080/health
+wget -qO- http://localhost:18800/health
 # {"status":"ok"}
 ```
 
@@ -428,7 +428,7 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://your-host/webhook/tel
 
 ### HTTP / WebSocket
 
-The HTTP gateway is always enabled on port 8080 (configurable). Endpoints:
+The HTTP gateway is always enabled on port 18800 (configurable). Endpoints:
 
 | Endpoint | Description |
 |---|---|
@@ -471,7 +471,7 @@ if they crash.
 
 After starting BeamClaw in any mode:
 
-1. **Health endpoint**: `wget -qO- http://localhost:8080/health` should return `{"status":"ok"}`
+1. **Health endpoint**: `wget -qO- http://localhost:18800/health` should return `{"status":"ok"}`
 2. **Log output**: look for `agent_start` and `session_start` events in the logs
 3. **TUI** (shell mode): type a message — the agentic loop should respond
 4. **Telegram**: send `/start` to your bot

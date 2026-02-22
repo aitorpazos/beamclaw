@@ -28,14 +28,14 @@ docker run -d \
   --name beamclaw \
   -e OPENROUTER_API_KEY=sk-or-... \
   -e TELEGRAM_BOT_TOKEN=...      \
-  -p 8080:8080                   \
+  -p 18800:18800                 \
   ghcr.io/beamclaw/beamclaw:latest
 ```
 
 Verify the node is healthy:
 
 ```bash
-wget -qO- http://localhost:8080/health
+wget -qO- http://localhost:18800/health
 ```
 
 See [docs/running.md](docs/running.md) for full Docker usage, channel selection, and MCP

@@ -17,6 +17,7 @@ resolved at runtime by `bc_config:get/2` via `os:getenv/1`.
 | `OPENROUTER_API_KEY` | Yes (if using OpenRouter) | OpenRouter API key (`sk-or-...`) |
 | `OPENAI_API_KEY` | Yes (if using OpenAI) | OpenAI API key (`sk-...`) |
 | `TELEGRAM_BOT_TOKEN` | Only if using Telegram | Telegram bot token from @BotFather |
+| `BEAMCLAW_PORT` | No | Override gateway HTTP port (default: `18800`) |
 | `BEAMCLAW_COOKIE` | No | Erlang cluster cookie (default: `beamclaw_dev`) |
 | `BEAMCLAW_HOME` | No | Override workspace base directory (default: `~/.beamclaw`) |
 | `BEAMCLAW_AGENT` | No | Default agent name for TUI sessions (default: `default`) |
@@ -122,7 +123,7 @@ to the agentic loop.
 {beamclaw_gateway, [
     %% HTTP gateway configuration.
     {http, #{
-        port => 8080    %% TCP port for Cowboy listener
+        port => 18800   %% TCP port for Cowboy listener; override with BEAMCLAW_PORT env var
     }},
 
     %% Channel configuration.

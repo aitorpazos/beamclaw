@@ -36,10 +36,10 @@ USER beamclaw
 WORKDIR /opt/beamclaw
 
 # HTTP gateway (configurable via sys.docker.config)
-EXPOSE 8080
+EXPOSE 18800
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget -qO- http://localhost:8080/health || exit 1
+    CMD wget -qO- http://localhost:18800/health || exit 1
 
 # Run the node in foreground so Docker can capture stdout and manage lifecycle.
 # Secrets are injected via -e flags at runtime — never baked into the image.

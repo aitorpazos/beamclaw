@@ -39,7 +39,11 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 init([]) ->
-    Port = maps:get(port, bc_config:get(beamclaw_gateway, http, #{port => 8080}), 8080),
+    ConfigPort = maps:get(port, bc_config:get(beamclaw_gateway, http, #{port => 18800}), 18800),
+    Port = case os:getenv("BEAMCLAW_PORT") of
+        false -> ConfigPort;
+        P     -> list_to_integer(P)
+    end,
     Routes = cowboy_router:compile([
         {'_', [
             {"/health",               bc_http_health_h,      []},

@@ -46,7 +46,7 @@ Output:     _build/default/bin/beamclaw
 
 -define(VERSION, "0.1.0").
 -define(DAEMON_SNAME, beamclaw).
--define(GATEWAY_PORT, 8080).
+-define(GATEWAY_PORT, 18800).
 
 %%--------------------------------------------------------------------
 %% Entry point
@@ -651,7 +651,7 @@ cmd_help() ->
         "  OPENROUTER_API_KEY   Required for LLM completions~n"
         "  OPENAI_API_KEY       Optional alternative provider~n"
         "  TELEGRAM_BOT_TOKEN   Optional Telegram channel~n"
-        "  BEAMCLAW_PORT        Override gateway port (default: 8080)~n"
+        "  BEAMCLAW_PORT        Override gateway port (default: 18800)~n"
         "  BEAMCLAW_AGENT       Default agent name (default: default)~n"
         "  BEAMCLAW_USER        Override user identity for session sharing~n"
         "  BEAMCLAW_HOME        Override workspace base directory~n"
@@ -716,7 +716,11 @@ apply_tui_config() ->
     application:set_env(beamclaw_core, session_cleanup_interval_ms, 300000,
                         [{persistent, true}]),
     application:set_env(beamclaw_mcp, servers, [], [{persistent, true}]),
-    application:set_env(beamclaw_gateway, http, #{port => ?GATEWAY_PORT},
+    TuiPort = case os:getenv("BEAMCLAW_PORT") of
+        false -> ?GATEWAY_PORT;
+        PortStr -> list_to_integer(PortStr)
+    end,
+    application:set_env(beamclaw_gateway, http, #{port => TuiPort},
                         [{persistent, true}]),
     TuiChannel = {tui, #{enabled => true}},
     Channels = case os:getenv("TELEGRAM_BOT_TOKEN") of
