@@ -38,7 +38,7 @@ COPY --from=builder --chown=beamclaw:beamclaw \
      /build/_build/default/bin/beamclaw /opt/beamclaw/beamclaw-ctl
 
 # Convenience wrapper so `beamclaw-ctl <cmd>` works directly
-RUN printf '#!/bin/sh\nexec /opt/beamclaw/bin/beamclaw escript /opt/beamclaw/beamclaw-ctl "$@"\n' \
+RUN printf '#!/bin/sh\nexec /opt/beamclaw/bin/beamclaw escript beamclaw-ctl "$@"\n' \
     > /usr/local/bin/beamclaw-ctl && chmod +x /usr/local/bin/beamclaw-ctl
 
 USER beamclaw
