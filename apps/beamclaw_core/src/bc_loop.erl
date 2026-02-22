@@ -163,6 +163,11 @@ finalizing(enter, _OldState, Data) ->
     gen_statem:cast(self(), do_finalize),
     {keep_state, Data};
 finalizing(cast, do_finalize, Data) ->
+    %% Signal reply_pid consumers that the full turn is done (all tool rounds).
+    case Data#loop_data.reply_pid of
+        undefined -> ok;
+        RPid      -> RPid ! {bc_turn_complete, Data#loop_data.session_id}
+    end,
     bc_session:turn_complete(Data#loop_data.session_pid, ok),
     bc_obs:emit(turn_complete, #{session_id => Data#loop_data.session_id}),
     {next_state, idle,

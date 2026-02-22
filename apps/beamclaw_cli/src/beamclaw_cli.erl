@@ -7,6 +7,8 @@
 -module(beamclaw_cli).
 -export([main/1]).
 
+-include_lib("beamclaw_core/include/bc_types.hrl").
+
 -define(VERSION, "0.1.0").
 -define(DAEMON_NODE, 'beamclaw@localhost').
 -define(GATEWAY_PORT, 8080).
@@ -35,8 +37,15 @@ main([Unknown          |_]) ->
 %% Commands
 %%--------------------------------------------------------------------
 
-%% @doc Start interactive TUI chat. Exclusive stdin; blocks until EOF.
+%% @doc Start interactive TUI chat — auto-detects running daemon.
 cmd_tui() ->
+    case try_connect_daemon() of
+        connected   -> cmd_remote_tui();
+        not_running -> cmd_local_tui()
+    end.
+
+%% @doc Start the TUI in-process (no daemon running).
+cmd_local_tui() ->
     apply_tui_config(),
     case application:ensure_all_started(beamclaw_gateway) of
         {ok, _} ->
@@ -56,6 +65,101 @@ cmd_tui() ->
             receive
                 {'DOWN', Ref, process, _, _} -> halt(0)
             end
+    end.
+
+%% @doc Attach a remote TUI to a running daemon via Erlang distribution.
+cmd_remote_tui() ->
+    erlang:monitor_node(?DAEMON_NODE, true),
+    SessionId = generate_remote_session_id(),
+    io:format("BeamClaw TUI (remote) — connected to ~s~n", [?DAEMON_NODE]),
+    io:format("Type a message and press Enter. Ctrl+D to disconnect.~n~n> "),
+    remote_tui_loop(SessionId).
+
+remote_tui_loop(SessionId) ->
+    case io:get_line("") of
+        eof ->
+            io:format("~n[disconnected]~n"),
+            halt(0);
+        {error, _} ->
+            io:format("~n[stdin error — disconnecting]~n"),
+            halt(1);
+        Line ->
+            Text = string:trim(Line, trailing, "\n"),
+            case Text of
+                "" ->
+                    io:format("> "),
+                    remote_tui_loop(SessionId);
+                _ ->
+                    dispatch_remote(SessionId, iolist_to_binary(Text)),
+                    receive_remote_response(SessionId),
+                    remote_tui_loop(SessionId)
+            end
+    end.
+
+dispatch_remote(SessionId, Text) ->
+    %% Ensure session exists on daemon.
+    case rpc:call(?DAEMON_NODE, bc_session_registry, lookup, [SessionId]) of
+        {error, not_found} ->
+            Config = #{session_id  => SessionId,
+                       user_id     => <<"remote_tui_user">>,
+                       channel_id  => SessionId,
+                       channel_mod => undefined},
+            case rpc:call(?DAEMON_NODE, bc_sessions_sup, start_session, [Config]) of
+                {ok, _}         -> ok;
+                {badrpc, Reason} ->
+                    io:format(standard_error,
+                              "~nbeamclaw: RPC failed creating session: ~p~n", [Reason]),
+                    halt(1);
+                {error, Reason} ->
+                    io:format(standard_error,
+                              "~nbeamclaw: failed to create session: ~p~n", [Reason]),
+                    halt(1)
+            end;
+        {ok, _Pid} ->
+            ok;
+        {badrpc, Reason} ->
+            io:format(standard_error,
+                      "~nbeamclaw: RPC failed: ~p~n", [Reason]),
+            halt(1)
+    end,
+    %% Lookup session pid and dispatch the run with reply_pid = self().
+    case rpc:call(?DAEMON_NODE, bc_session_registry, lookup, [SessionId]) of
+        {ok, SPid} ->
+            Msg = #bc_channel_message{
+                session_id = SessionId,
+                user_id    = <<"remote_tui_user">>,
+                channel    = remote_tui,
+                content    = Text,
+                raw        = Text,
+                ts         = erlang:system_time(millisecond),
+                reply_pid  = self()
+            },
+            rpc:call(?DAEMON_NODE, bc_session, dispatch_run, [SPid, Msg]);
+        {badrpc, Reason2} ->
+            io:format(standard_error,
+                      "~nbeamclaw: RPC failed dispatching run: ~p~n", [Reason2]),
+            halt(1);
+        {error, not_found} ->
+            io:format(standard_error,
+                      "~nbeamclaw: session disappeared after creation~n", []),
+            halt(1)
+    end.
+
+receive_remote_response(SessionId) ->
+    receive
+        {bc_chunk, SessionId, Chunk} ->
+            io:format("~s", [Chunk]),
+            receive_remote_response(SessionId);
+        {bc_done, SessionId, _Msg} ->
+            io:format("~n"),
+            receive_remote_response(SessionId);
+        {bc_turn_complete, SessionId} ->
+            io:format("> ");
+        {nodedown, _Node} ->
+            io:format("~n[daemon disconnected]~n"),
+            halt(1)
+    after 120000 ->
+        io:format("~n[timeout — no response within 120s]~n> ")
     end.
 
 %% @doc Start gateway as a background daemon (Erlang distribution IPC).
@@ -163,6 +267,7 @@ cmd_help() ->
         "Usage: beamclaw <command>~n~n"
         "Commands:~n"
         "  tui              Start interactive TUI chat (default)~n"
+        "                   Connects to running daemon if available~n"
         "  start            Start gateway as background daemon~n"
         "  stop             Stop running daemon~n"
         "  restart          Stop then start daemon~n"
@@ -173,6 +278,7 @@ cmd_help() ->
         "  help             Show this help~n~n"
         "Notes:~n"
         "  TUI: use Ctrl+D (EOF) to quit.~n"
+        "  If a daemon is running (beamclaw start), tui auto-connects to it.~n"
         "  Ctrl+C shows the OTP break menu (type 'q' + Enter to exit).~n"
         "  Daemon IPC uses Erlang distribution; epmd must be available.~n~n"
         "Environment:~n"
@@ -224,6 +330,40 @@ apply_tui_config() ->
                         [{persistent, true}]).
 
 %%--------------------------------------------------------------------
+%% Internal: daemon detection
+%%--------------------------------------------------------------------
+
+%% Soft daemon detection: try to start distribution and ping the daemon.
+%% Returns `connected` or `not_running` — never halts.
+try_connect_daemon() ->
+    case ensure_ctl_node_soft() of
+        ok ->
+            case net_adm:ping(?DAEMON_NODE) of
+                pong -> connected;
+                pang -> not_running
+            end;
+        {error, _} ->
+            not_running
+    end.
+
+%% Like ensure_ctl_node/0 but returns ok | {error, Reason} instead of halt(1).
+ensure_ctl_node_soft() ->
+    Id   = integer_to_list(erlang:unique_integer([positive])),
+    Name = list_to_atom("beamclaw_ctl_" ++ Id ++ "@localhost"),
+    case net_kernel:start([Name, shortnames]) of
+        {ok, _}                       -> ok;
+        {error, {already_started, _}} -> ok;
+        {error, Reason}               -> {error, Reason}
+    end.
+
+%% Generate a unique session ID for remote TUI connections.
+generate_remote_session_id() ->
+    <<A:32, B:16, C:16, D:16, E:48>> = crypto:strong_rand_bytes(16),
+    UUID = io_lib:format("~8.16.0b-~4.16.0b-4~3.16.0b-~4.16.0b-~12.16.0b",
+                         [A, B, C band 16#0fff, D band 16#3fff bor 16#8000, E]),
+    iolist_to_binary(["remote-tui-" | UUID]).
+
+%%--------------------------------------------------------------------
 %% Internal: daemon lifecycle
 %%--------------------------------------------------------------------
 
@@ -258,7 +398,12 @@ spawn_daemon() ->
         true  -> ["-config", "config/sys"];
         false -> []
     end,
-    Eval = "application:ensure_all_started(beamclaw_gateway),"
+    %% Disable the TUI channel in daemon mode — no stdin available.
+    %% Replace the tui entry in the channels list; preserve other channels.
+    Eval = "Chs = application:get_env(beamclaw_gateway, channels, []),"
+           "Chs2 = lists:keyreplace(tui, 1, Chs, {tui, #{enabled => false}}),"
+           "application:set_env(beamclaw_gateway, channels, Chs2, [{persistent, true}]),"
+           "application:ensure_all_started(beamclaw_gateway),"
            "receive after infinity -> ok end.",
     DaemonArgs = ["-noshell", "-sname", "beamclaw"]
                  ++ PaArgs

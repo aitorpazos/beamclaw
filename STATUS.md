@@ -147,6 +147,22 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `beamclaw version` | ✅ | Prints version string |
 | `beamclaw help` | ✅ | Usage summary |
 
+### M10 — Remote TUI (`beamclaw start` + `beamclaw tui`) ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `{bc_turn_complete}` signal in `bc_loop` finalizing | ✅ | 4 lines; benefits all `reply_pid` consumers |
+| `ensure_ctl_node_soft/0` + `try_connect_daemon/0` | ✅ | Soft daemon detection; no halt on epmd absence |
+| Refactor `cmd_tui/0` → auto-detect daemon | ✅ | connected → remote; not_running → local |
+| `cmd_remote_tui/0` + `remote_tui_loop/1` | ✅ | Blocking stdin loop on escript node |
+| `dispatch_remote/2` | ✅ | RPC session create + dispatch with `reply_pid = self()` |
+| `receive_remote_response/1` | ✅ | Chunk streaming + `bc_done` + `bc_turn_complete` |
+| `generate_remote_session_id/0` | ✅ | UUID v4 with `remote-tui-` prefix |
+| `spawn_daemon/0` TUI disable | ✅ | `lists:keyreplace` to set `tui enabled=false` |
+| `nodedown` + `badrpc` handling | ✅ | Graceful disconnect on daemon death or RPC error |
+| `cmd_help/0` update | ✅ | Documents auto-connect behaviour |
+| `docs/running.md` update | ✅ | Remote TUI workflow documented |
+
 ---
 
 ## Known Issues / Blockers
@@ -157,4 +173,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-21 (Post-M9: documentation synced with all milestones; CLAUDE.md, docs/architecture.md, docs/building.md, docs/running.md updated)
+2026-02-22 (M10: Remote TUI — `beamclaw tui` auto-connects to running daemon via Erlang distribution)
