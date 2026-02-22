@@ -453,6 +453,10 @@ Usage: `bc_obs:emit(tool_call_start, #{tool_name => Name, args => Args, session_
 
 `bc_config:get(App, Key)` resolves `{env, "VAR"}` tuples at runtime via `os:getenv/1`.
 
+`bc_config:canonical_user_id/0` returns the `BEAMCLAW_USER` env var as a binary,
+or `undefined` if not set. When set, all channels use this value as-is (no prefix)
+as the user_id, enabling cross-channel session sharing for single-user deployments.
+
 ```erlang
 {kernel, [
     {logger_level, info},

@@ -662,13 +662,13 @@ ensure_ctl_node_soft() ->
 
 %% @doc Derive user_id for CLI/remote TUI from BEAMCLAW_USER / USER env vars.
 cli_user_id() ->
-    case os:getenv("BEAMCLAW_USER") of
-        false ->
+    case bc_config:canonical_user_id() of
+        undefined ->
             case os:getenv("USER") of
                 false -> <<"local:anonymous">>;
                 U     -> iolist_to_binary(["local:", U])
             end;
-        U -> iolist_to_binary(["local:", U])
+        Canonical -> Canonical
     end.
 
 %%--------------------------------------------------------------------

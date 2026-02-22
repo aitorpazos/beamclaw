@@ -89,25 +89,40 @@ mode — no behaviour change from before.
 
 By default (`session_sharing = shared`), BeamClaw derives session IDs
 deterministically from `{user_id, agent_id}`. This means the same user talking
-to the same agent will share a single conversation across all channels:
+to the same agent will share a single conversation across all channels.
+
+**Cross-channel sharing with `BEAMCLAW_USER`**: When the `BEAMCLAW_USER`
+environment variable is set, **all channels** use that value as the canonical
+user identity (no channel prefix). This ensures the same session is used
+whether you talk via TUI, Telegram, HTTP, or WebSocket:
 
 ```bash
-# Terminal 1: TUI as alice
-BEAMCLAW_USER=alice beamclaw tui --agent default
-> Hello, remember my name is Alice
+# Set canonical identity on the daemon
+export BEAMCLAW_USER=peter
+beamclaw start
 
-# Terminal 2: same user via another TUI or Telegram
-# Shares the same conversation — agent remembers Alice
+# Terminal 1: Telegram — tell agent your name
+# Terminal 2: TUI — agent remembers across channels
+beamclaw tui
+> What's my name?
+# Agent remembers from the Telegram conversation
 ```
 
-User identity per channel:
+When `BEAMCLAW_USER` is **not set**, each channel prefixes user IDs
+independently, which means cross-channel sharing only works if the prefixed
+IDs happen to match (they won't across different channel types):
 
 | Channel | User ID format | Source |
 |---------|---------------|--------|
-| TUI | `local:<username>` | `BEAMCLAW_USER` env → `USER` env → `anonymous` |
+| TUI | `local:<username>` | `USER` env → `anonymous` |
 | Telegram | `tg:<telegram_user_id>` | From Telegram message `from.id` |
 | HTTP | `api:<user_id>` | `X-User-Id` header or `user_id` in body |
 | WebSocket | `ws:<user_id>` | `user_id` in message payload |
+
+| `BEAMCLAW_USER` | TUI user_id | Telegram user_id | HTTP user_id |
+|-----------------|-------------|-------------------|--------------|
+| Not set | `local:<USER>` | `tg:<tg_id>` | `api:<header>` |
+| Set to `peter` | `peter` | `peter` | `peter` |
 
 To isolate sessions per channel (legacy behaviour), set `{session_sharing, per_channel}`
 in `sys.config`.

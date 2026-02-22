@@ -1,7 +1,7 @@
 %% @doc Configuration helpers. Resolves {env, "VAR"} tuples at runtime.
 -module(bc_config).
 
--export([get/2, get/3, resolve/1]).
+-export([get/2, get/3, resolve/1, canonical_user_id/0]).
 
 %% @doc Get a config value, crash if not found.
 -spec get(App :: atom(), Key :: atom()) -> term().
@@ -34,3 +34,13 @@ resolve(Tuple) when is_tuple(Tuple) ->
     list_to_tuple(lists:map(fun resolve/1, tuple_to_list(Tuple)));
 resolve(Val) ->
     Val.
+
+%% @doc Return the canonical user identity from BEAMCLAW_USER, or undefined.
+%% When set, all channels use this value as-is (no prefix) so that a single
+%% user shares one session across TUI, Telegram, HTTP, and WebSocket.
+-spec canonical_user_id() -> binary() | undefined.
+canonical_user_id() ->
+    case os:getenv("BEAMCLAW_USER") of
+        false -> undefined;
+        Val   -> list_to_binary(Val)
+    end.

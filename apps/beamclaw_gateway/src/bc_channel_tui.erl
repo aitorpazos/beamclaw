@@ -118,13 +118,13 @@ code_change(_OldVsn, State, _)  -> {ok, State}.
 %% Internal
 
 tui_user_id() ->
-    case os:getenv("BEAMCLAW_USER") of
-        false ->
+    case bc_config:canonical_user_id() of
+        undefined ->
             case os:getenv("USER") of
                 false -> <<"local:anonymous">>;
                 U     -> iolist_to_binary(["local:", U])
             end;
-        U -> iolist_to_binary(["local:", U])
+        Canonical -> Canonical
     end.
 
 ensure_session_and_dispatch(SessionId, Msg, UserId, AgentId) ->

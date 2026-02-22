@@ -20,7 +20,7 @@ resolved at runtime by `bc_config:get/2` via `os:getenv/1`.
 | `BEAMCLAW_COOKIE` | No | Erlang cluster cookie (default: `beamclaw_dev`) |
 | `BEAMCLAW_HOME` | No | Override workspace base directory (default: `~/.beamclaw`) |
 | `BEAMCLAW_AGENT` | No | Default agent name for TUI sessions (default: `default`) |
-| `BEAMCLAW_USER` | No | Override user identity for session sharing (default: system `USER`) |
+| `BEAMCLAW_USER` | No | Canonical user identity for cross-channel session sharing. When set, all channels (TUI, Telegram, HTTP, WebSocket) use this value as-is (no prefix), enabling a single shared session across channels. When unset, each channel prefixes user IDs independently. |
 
 At least one of `OPENROUTER_API_KEY` or `OPENAI_API_KEY` must be set, depending on
 `default_provider`.

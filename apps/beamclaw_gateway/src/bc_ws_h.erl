@@ -42,8 +42,12 @@ terminate(_Reason, _Req, _State) ->
 
 handle_ws_message(#{<<"type">> := <<"message">>, <<"content">> := Content} = Msg, State) ->
     AgentId   = maps:get(<<"agent_id">>, Msg, <<"default">>),
-    RawUserId = maps:get(<<"user_id">>, Msg, <<"anonymous">>),
-    UserId    = <<"ws:", RawUserId/binary>>,
+    UserId = case bc_config:canonical_user_id() of
+        undefined ->
+            RawUserId = maps:get(<<"user_id">>, Msg, <<"anonymous">>),
+            <<"ws:", RawUserId/binary>>;
+        Canonical -> Canonical
+    end,
     SessionId = bc_session_registry:derive_session_id(UserId, AgentId, websocket),
     ChannelMsg = #bc_channel_message{
         session_id = SessionId,

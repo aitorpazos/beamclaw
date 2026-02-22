@@ -22,7 +22,8 @@ session_registry_test_() ->
         fun different_agent_different_id/0,
         fun session_id_format/0,
         fun shared_mode_ignores_channel/0,
-        fun per_channel_mode_differs/0
+        fun per_channel_mode_differs/0,
+        fun canonical_user_same_session_across_channels/0
     ]}.
 
 deterministic() ->
@@ -68,3 +69,19 @@ per_channel_mode_differs() ->
     ?assertNotEqual(Id1, Id2),
     %% Reset to shared for other tests
     application:set_env(beamclaw_core, session_sharing, shared, [{persistent, true}]).
+
+%% When BEAMCLAW_USER is set, all channels use the same unprefixed user_id.
+%% This test verifies that the same canonical user_id (no channel prefix)
+%% produces identical session IDs regardless of channel — the fix for
+%% cross-channel session sharing.
+canonical_user_same_session_across_channels() ->
+    application:set_env(beamclaw_core, session_sharing, shared, [{persistent, true}]),
+    %% Simulate canonical user: all channels pass "peter" with no prefix
+    Canonical = <<"peter">>,
+    Id1 = bc_session_registry:derive_session_id(Canonical, <<"default">>, tui),
+    Id2 = bc_session_registry:derive_session_id(Canonical, <<"default">>, telegram),
+    Id3 = bc_session_registry:derive_session_id(Canonical, <<"default">>, http),
+    Id4 = bc_session_registry:derive_session_id(Canonical, <<"default">>, websocket),
+    ?assertEqual(Id1, Id2),
+    ?assertEqual(Id2, Id3),
+    ?assertEqual(Id3, Id4).

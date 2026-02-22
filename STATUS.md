@@ -5,7 +5,7 @@
 Scaffolding is complete. All seven OTP apps compile clean with zero warnings.
 Multi-agent workspaces (M11–M13), rich templates (M14), daily logs (M15),
 skill system (M16–M17), session persistence (M18), and cross-channel session
-sharing (M19) are complete. 179 EUnit tests pass.
+sharing (M19) are complete. Cross-channel session fix applied. 180 EUnit tests pass.
 
 ---
 
@@ -304,6 +304,19 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `beamclaw_cli.erl` update | ✅ | `cli_user_id/0`; remote derive_session_id via RPC; `BEAMCLAW_USER` |
 | EUnit tests | ✅ | 7 tests (bc_session_registry_tests) |
 
+### Post-M19 — Cross-Channel Session Sharing Fix ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `bc_config:canonical_user_id/0` | ✅ | Centralised `BEAMCLAW_USER` check; returns binary or `undefined` |
+| `bc_channel_tui.erl` update | ✅ | Use canonical_user_id; skip `local:` prefix when set |
+| `bc_channel_telegram.erl` update | ✅ | Use canonical_user_id; skip `tg:` prefix when set |
+| `bc_http_completions_h.erl` update | ✅ | Use canonical_user_id; skip `api:` prefix when set |
+| `bc_ws_h.erl` update | ✅ | Use canonical_user_id; skip `ws:` prefix when set |
+| `beamclaw_cli.erl` update | ✅ | Use canonical_user_id; skip `local:` prefix when set |
+| EUnit test | ✅ | 8 tests (bc_session_registry_tests); canonical cross-channel test added |
+| Docs update | ✅ | running.md, configuration.md, CLAUDE.md |
+
 ---
 
 ## Known Issues / Blockers
@@ -314,4 +327,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (M18–M19: Session Persistence + Cross-Channel Sharing — 179 tests, 0 warnings)
+2026-02-22 (Post-M19: Cross-channel session sharing fix — 180 tests, 0 warnings)

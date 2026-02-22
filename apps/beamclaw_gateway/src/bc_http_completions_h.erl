@@ -51,11 +51,15 @@ dispatch_and_respond(Decoded, Req, State) ->
     AgentId   = maps:get(<<"agent_id">>,   Decoded, <<"default">>),
     Content   = get_last_user_message(Messages),
     %% Derive user_id from header or body, with prefix
-    RawUserId = case cowboy_req:header(<<"x-user-id">>, Req) of
-        undefined -> maps:get(<<"user_id">>, Decoded, <<"anonymous">>);
-        HeaderVal -> HeaderVal
+    UserId = case bc_config:canonical_user_id() of
+        undefined ->
+            RawUserId = case cowboy_req:header(<<"x-user-id">>, Req) of
+                undefined -> maps:get(<<"user_id">>, Decoded, <<"anonymous">>);
+                HeaderVal -> HeaderVal
+            end,
+            <<"api:", RawUserId/binary>>;
+        Canonical -> Canonical
     end,
-    UserId = <<"api:", RawUserId/binary>>,
     %% Use explicit session_id if provided (backward compat), else derive
     SessionId = case maps:get(<<"session_id">>, Decoded, undefined) of
         undefined -> bc_session_registry:derive_session_id(UserId, AgentId, http);

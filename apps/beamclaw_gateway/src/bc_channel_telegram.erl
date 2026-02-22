@@ -141,7 +141,10 @@ dispatch_telegram_message(Update) ->
     Chat   = maps:get(<<"chat">>,    Msg,    #{}),
     TgUserId = integer_to_binary(maps:get(<<"id">>, From, 0)),
     ChatId   = integer_to_binary(maps:get(<<"id">>, Chat, 0)),
-    UserId   = <<"tg:", TgUserId/binary>>,
+    UserId = case bc_config:canonical_user_id() of
+        undefined -> <<"tg:", TgUserId/binary>>;
+        Canonical -> Canonical
+    end,
     AgentId  = bc_config:get(beamclaw_core, default_agent, <<"default">>),
     SessionId = bc_session_registry:derive_session_id(UserId, AgentId, telegram),
     %% Map the derived SessionId to the Telegram ChatId for response routing.
