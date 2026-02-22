@@ -19,7 +19,7 @@ COPY config/ config/
 RUN rebar3 as docker release
 
 ## ---- Stage 2: Minimal runtime ----------------------------------------------
-FROM alpine:3.21
+FROM alpine:3.23
 
 # Erlang runtime C-library dependencies only — no Erlang package needed
 # because the OTP release from stage 1 bundles its own ERTS.

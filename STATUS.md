@@ -116,7 +116,7 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `rebar3 release` config (`relx` + `docker` profile) | ✅ | Added to `rebar.config`; `{include_erts, true}` bundles ERTS |
 | `vm.args` production tuning | ✅ | `-sname`, `+sbwt none`, `+MBas aobf`, comments on every flag |
 | `sys.docker.config` | ✅ | TUI disabled; identical otherwise to `sys.config` |
-| `Dockerfile` (multi-stage) | ✅ | `erlang:28-alpine` builder → `alpine:3.21` runtime; non-root user |
+| `Dockerfile` (multi-stage) | ✅ | `erlang:28-alpine` builder → `alpine:3.23` runtime; non-root user |
 | `.dockerignore` | ✅ | Excludes `_build/`, beams, secrets, `.git/` |
 | `.gitignore` security fix | ✅ | Added `.env`, `*.env`, `*.secret`, `priv/secrets/` |
 | `README.md` rewrite | ✅ | Pitch, Docker quick-start, source quick-start, docs links |
@@ -371,6 +371,13 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `Dockerfile` update | ✅ | `EXPOSE 18800`; healthcheck URL updated |
 | Docs update | ✅ | README, running.md, configuration.md, CLAUDE.md |
 
+### Post-M20 — Sync sys.docker.config ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `sys.docker.config` full sync | ✅ | Added kernel logger (console-only), default_agent, session persistence/sharing/cleanup, skills, dm_policy, allow_from |
+| `docs/configuration.md` update | ✅ | Docker-Specific Config section lists both differences (TUI + logger) |
+
 ---
 
 ## Known Issues / Blockers
@@ -381,4 +388,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (Cowboy gen_server wrap — Post-M20)
+2026-02-22 (Sync sys.docker.config — Post-M20)

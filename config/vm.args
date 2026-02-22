@@ -9,9 +9,6 @@
 ## Useful in production; disable for interactive debugging.
 ## -heart
 
-## Scheduler threads — "auto" lets the VM match available CPU cores.
-+S auto
-
 ## Async thread pool size.
 ## Handles blocking I/O (file, port I/O) off the schedulers.
 ## 32 is a good starting point for I/O-heavy workloads.

@@ -238,14 +238,15 @@ Key flags in `config/vm.args`:
 
 ## Docker-Specific Config (sys.docker.config)
 
-`config/sys.docker.config` is identical to `sys.config` with one change:
+`config/sys.docker.config` is identical to `sys.config` with two differences:
 
-```erlang
-{tui, #{enabled => false}}
-```
+1. **TUI disabled**: `{tui, #{enabled => false}}` — stdin is not available in detached
+   Docker containers.
+2. **Console-only logger**: The `kernel` logger has only the console handler (no file
+   handler). Docker captures stdout via its log driver, so writing to a log file inside
+   the container is unnecessary.
 
-The TUI reads from stdin, which is not available in detached Docker containers. The
-`docker` rebar3 profile (`rebar3 as docker release`) automatically selects this config.
+The `docker` rebar3 profile (`rebar3 as docker release`) automatically selects this config.
 
 ---
 

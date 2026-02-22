@@ -142,7 +142,7 @@ The build uses a multi-stage `Dockerfile`:
 | Stage | Base image | Purpose |
 |---|---|---|
 | `builder` | `erlang:28-alpine` | Compile + `rebar3 as docker release` |
-| runtime | `alpine:3.21` | Copy self-contained release; no Erlang package needed |
+| runtime | `alpine:3.23` | Copy self-contained release; no Erlang package needed |
 
 The `docker` rebar3 profile (`rebar3 as docker release`) uses `config/sys.docker.config`
 instead of `config/sys.config`. The only difference is that the TUI channel is disabled
