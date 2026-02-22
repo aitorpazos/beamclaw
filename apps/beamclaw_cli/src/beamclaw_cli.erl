@@ -405,12 +405,12 @@ spawn_daemon() ->
            "application:set_env(beamclaw_gateway, channels, Chs2, [{persistent, true}]),"
            "application:ensure_all_started(beamclaw_gateway),"
            "receive after infinity -> ok end.",
-    DaemonArgs = ["-noshell", "-sname", "beamclaw"]
+    DaemonArgs = ["-detached", "-noshell", "-sname", "beamclaw"]
                  ++ PaArgs
                  ++ ConfigArgs
                  ++ ["-eval", Eval],
     erlang:open_port({'spawn_executable', ErlBin},
-                     [{args, DaemonArgs}, detached]),
+                     [{args, DaemonArgs}]),
     case poll_node_up(?DAEMON_NODE, 10, 500) of
         ok ->
             io:format("Gateway started.~n"),
