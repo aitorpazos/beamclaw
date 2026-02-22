@@ -44,7 +44,8 @@ execute(#{<<"url">> := Url} = Args, _Session, _Context) ->
     HList   = maps:to_list(Headers),
     Req     = {binary_to_list(Url), HList, "application/json", Body},
     MethodAtom = list_to_atom(string:lowercase(binary_to_list(Method))),
-    case httpc:request(MethodAtom, Req, [], []) of
+    case httpc:request(MethodAtom, Req,
+                       [{timeout, 30000}, {connect_timeout, 10000}], []) of
         {ok, {{_, StatusCode, _}, _RespHeaders, RespBody}} ->
             Result = iolist_to_binary(io_lib:format("~p\n~s", [StatusCode, RespBody])),
             {ok, Result};

@@ -105,7 +105,8 @@ post(#{api_key := Key, base_url := Base}, Path, Body) ->
     Url     = Base ++ Path,
     Headers = [{"authorization", "Bearer " ++ Key},
                {"content-type",  "application/json"}],
-    case httpc:request(post, {Url, Headers, "application/json", Body}, [], []) of
+    case httpc:request(post, {Url, Headers, "application/json", Body},
+                       [{timeout, 120000}, {connect_timeout, 10000}], []) of
         {ok, {{_, 200, _}, _, RespBody}} ->
             {ok, iolist_to_binary(RespBody)};
         {ok, {{_, Status, _}, _, RespBody}} ->
