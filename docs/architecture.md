@@ -157,7 +157,13 @@ atom is included in the session ID hash, producing separate sessions per channel
 ```
 idle
  │
- ├─(history > compaction_threshold)─→ compacting ─→ idle (then re-enter)
+ ├─(history > compaction_threshold)─→ compacting
+ │                                       │
+ │                              (memory_flush enabled)─→ memory flush (hidden LLM turn)
+ │                                       │                    │
+ │                                       └────────────────────┘
+ │                                       │
+ │                                   do_compact ─→ streaming
  │
  └─(new run arrives)─→ streaming
                           │
@@ -341,9 +347,13 @@ Empty/missing files are skipped. If the agent doesn't exist, a single fallback m
 
 ### Workspace memory tool (`bc_tool_workspace_memory`)
 
-A built-in tool that allows the agent to read, append to, or replace its own `MEMORY.md`.
-The path is constructed internally from `bc_session_ref.agent_id`, preventing path traversal.
-Requires no approval and runs at `read_only` autonomy.
+A built-in tool that allows the agent to manage its MEMORY.md, daily logs, and bootstrap
+files (IDENTITY.md, USER.md, SOUL.md, TOOLS.md, AGENTS.md). The path is constructed
+internally from `bc_session_ref.agent_id`, preventing path traversal. Requires no approval
+and runs at `read_only` autonomy.
+
+Actions: `read`, `append`, `replace` (MEMORY.md); `read_daily`, `append_daily`, `list_daily`
+(daily logs); `read_bootstrap`, `update_bootstrap` (bootstrap files — requires `file` parameter).
 
 ### Daily logs
 

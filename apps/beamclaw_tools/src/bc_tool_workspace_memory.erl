@@ -16,19 +16,22 @@
 
 -module(bc_tool_workspace_memory).
 -moduledoc """
-Built-in workspace_memory tool — read/append/replace MEMORY.md and daily logs.
+Built-in workspace_memory tool — manage MEMORY.md, daily logs, and bootstrap files.
 
-Allows the agent to manage its own long-term memory file and daily logs.
+Allows the agent to manage its own long-term memory file, daily logs, and
+bootstrap files (IDENTITY.md, USER.md, SOUL.md, TOOLS.md, AGENTS.md).
 The path is constructed internally from the agent_id in bc_session_ref,
 so no path traversal is possible.
 
 Actions:
-  - read:         Return current MEMORY.md content
-  - append:       Append text to MEMORY.md
-  - replace:      Replace entire MEMORY.md content
-  - read_daily:   Read today's daily log (or specific date)
-  - append_daily: Append text to today's daily log
-  - list_daily:   List available daily log files
+  - read:             Return current MEMORY.md content
+  - append:           Append text to MEMORY.md
+  - replace:          Replace entire MEMORY.md content
+  - read_daily:       Read today's daily log (or specific date)
+  - append_daily:     Append text to today's daily log
+  - list_daily:       List available daily log files
+  - read_bootstrap:   Read a bootstrap file by name (requires `file` parameter)
+  - update_bootstrap: Replace a bootstrap file's content (requires `file` + `content`)
 """.
 -behaviour(bc_tool).
 
@@ -40,19 +43,26 @@ Actions:
 
 definition() ->
     #{name        => <<"workspace_memory">>,
-      description => <<"Read, append to, or replace the agent's long-term MEMORY.md file. "
-                       "Also read and write daily logs (memory/YYYY-MM-DD.md).">>,
+      description => <<"Manage the agent's long-term MEMORY.md, daily logs, and bootstrap files. "
+                       "Use read/append/replace for MEMORY.md, read_daily/append_daily/list_daily "
+                       "for daily logs, and read_bootstrap/update_bootstrap for identity and config "
+                       "files (IDENTITY.md, USER.md, SOUL.md, TOOLS.md, AGENTS.md).">>,
       parameters  => #{
           type       => object,
           properties => #{
               action => #{type => string,
                           description => <<"Action to perform">>,
                           enum => [<<"read">>, <<"append">>, <<"replace">>,
-                                   <<"read_daily">>, <<"append_daily">>, <<"list_daily">>]},
+                                   <<"read_daily">>, <<"append_daily">>, <<"list_daily">>,
+                                   <<"read_bootstrap">>, <<"update_bootstrap">>]},
               content => #{type => string,
-                           description => <<"Text to append or replace with (for append, replace, append_daily)">>},
+                           description => <<"Text to append or replace with "
+                                            "(for append, replace, append_daily, update_bootstrap)">>},
               date => #{type => string,
-                        description => <<"Date in YYYY-MM-DD format (for read_daily/append_daily; defaults to today)">>}
+                        description => <<"Date in YYYY-MM-DD format (for read_daily/append_daily; defaults to today)">>},
+              file => #{type => string,
+                        description => <<"Bootstrap filename for read_bootstrap/update_bootstrap. "
+                                         "Allowed: IDENTITY.md, USER.md, SOUL.md, TOOLS.md, AGENTS.md">>}
           },
           required   => [<<"action">>]
       },
@@ -150,6 +160,43 @@ execute(#{<<"action">> := <<"list_daily">>}, Session, _Context) ->
             {error, iolist_to_binary(io_lib:format("list error: ~p", [Reason]))}
     end;
 
+%% ---- Bootstrap file actions ----
+
+execute(#{<<"action">> := <<"read_bootstrap">>, <<"file">> := File}, Session, _Context) ->
+    case validate_bootstrap_file(File) of
+        {ok, Name} ->
+            AgentId = Session#bc_session_ref.agent_id,
+            Path = bc_workspace_path:bootstrap_file(AgentId, Name),
+            case file:read_file(Path) of
+                {ok, Bin} when byte_size(Bin) > ?MAX_READ_SIZE ->
+                    Truncated = binary:part(Bin, 0, ?MAX_READ_SIZE),
+                    {ok, <<Truncated/binary, "\n[...truncated at 20KB...]">>};
+                {ok, Bin} ->
+                    {ok, Bin};
+                {error, enoent} ->
+                    {ok, <<"(", Name/binary, " does not exist yet)">>};
+                {error, Reason} ->
+                    {error, iolist_to_binary(io_lib:format("read error: ~p", [Reason]))}
+            end;
+        {error, Msg} ->
+            {error, Msg}
+    end;
+
+execute(#{<<"action">> := <<"update_bootstrap">>, <<"file">> := File,
+          <<"content">> := Content}, Session, _Context) ->
+    case validate_bootstrap_file(File) of
+        {ok, Name} ->
+            AgentId = Session#bc_session_ref.agent_id,
+            Path = bc_workspace_path:bootstrap_file(AgentId, Name),
+            filelib:ensure_dir(Path),
+            case file:write_file(Path, Content) of
+                ok              -> {ok, <<Name/binary, " updated.">>};
+                {error, Reason} -> {error, iolist_to_binary(io_lib:format("write error: ~p", [Reason]))}
+            end;
+        {error, Msg} ->
+            {error, Msg}
+    end;
+
 %% ---- Error cases ----
 
 execute(#{<<"action">> := <<"append">>}, _Session, _Context) ->
@@ -161,14 +208,37 @@ execute(#{<<"action">> := <<"replace">>}, _Session, _Context) ->
 execute(#{<<"action">> := <<"append_daily">>}, _Session, _Context) ->
     {error, <<"'content' is required for append_daily action">>};
 
+execute(#{<<"action">> := <<"read_bootstrap">>}, _Session, _Context) ->
+    {error, <<"'file' is required for read_bootstrap action">>};
+
+execute(#{<<"action">> := <<"update_bootstrap">>, <<"file">> := _}, _Session, _Context) ->
+    {error, <<"'content' is required for update_bootstrap action">>};
+
+execute(#{<<"action">> := <<"update_bootstrap">>}, _Session, _Context) ->
+    {error, <<"'file' and 'content' are required for update_bootstrap action">>};
+
 execute(_, _Session, _Context) ->
-    {error, <<"Invalid action. Use: read, append, replace, read_daily, append_daily, or list_daily">>}.
+    {error, <<"Invalid action. Use: read, append, replace, read_daily, append_daily, "
+              "list_daily, read_bootstrap, or update_bootstrap">>}.
 
 requires_approval() -> false.
 
 min_autonomy() -> read_only.
 
 %% Internal
+
+-define(ALLOWED_BOOTSTRAP_FILES,
+    [<<"IDENTITY.md">>, <<"USER.md">>, <<"SOUL.md">>,
+     <<"TOOLS.md">>, <<"AGENTS.md">>]).
+
+validate_bootstrap_file(File) when is_binary(File) ->
+    case lists:member(File, ?ALLOWED_BOOTSTRAP_FILES) of
+        true  -> {ok, File};
+        false -> {error, <<"Invalid bootstrap file '", File/binary, "'. "
+                           "Allowed: IDENTITY.md, USER.md, SOUL.md, TOOLS.md, AGENTS.md">>}
+    end;
+validate_bootstrap_file(_) ->
+    {error, <<"'file' must be a string">>}.
 
 resolve_date(#{<<"date">> := Date}) when is_binary(Date), byte_size(Date) > 0 ->
     Date;

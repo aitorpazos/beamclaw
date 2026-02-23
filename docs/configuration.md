@@ -64,7 +64,10 @@ them to a file — `.env` and `*.secret` files are excluded by `.gitignore`.
         %% Keep this many recent messages verbatim after compaction.
         compaction_target    => 20,
         %% Progressive streaming: send chunks of this many characters.
-        stream_chunk_size    => 80
+        stream_chunk_size    => 80,
+        %% Pre-compaction memory flush: fire a hidden LLM turn before compacting
+        %% to let the agent save durable memories to workspace files.
+        memory_flush         => true
     }},
 
     %% Default autonomy level for new sessions.

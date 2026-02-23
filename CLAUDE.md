@@ -245,7 +245,7 @@ Implementations: `bc_provider_openrouter`, `bc_provider_openai`.
 -callback min_autonomy() -> autonomy_level().
 ```
 
-Implementations: `bc_tool_terminal`, `bc_tool_bash`, `bc_tool_curl`, `bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory` (MEMORY.md + daily logs).
+Implementations: `bc_tool_terminal`, `bc_tool_bash`, `bc_tool_curl`, `bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory` (MEMORY.md + daily logs + bootstrap files).
 
 ### `bc_channel` — Messaging channel abstraction (`beamclaw_core`)
 
@@ -344,6 +344,7 @@ idle → compacting (optional) → streaming → awaiting_approval (optional)
 
 State transition rules:
 - Enter `compacting` from `idle` when `length(History) > compaction_threshold`
+- In `compacting`: if `memory_flush` is enabled (default), fire a hidden LLM turn to save durable memories before compaction
 - Enter `awaiting_approval` from `streaming` when any tool call requires approval and autonomy ≠ `full`
 - Loop back to `streaming` after `executing_tools` until no tool calls remain
 - On any crash in `streaming`/`executing_tools`, supervisor restarts the loop; `bc_session` retains history
@@ -488,7 +489,8 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
     {agentic_loop, #{max_tool_iterations => 10,
                      compaction_threshold => 50,
                      compaction_target    => 20,
-                     stream_chunk_size    => 80}},
+                     stream_chunk_size    => 80,
+                     memory_flush         => true}},
     {autonomy_level, supervised},
     {session_ttl_seconds, 3600},
     {default_agent, <<"default">>},
@@ -601,7 +603,7 @@ beamclaw/
       bc_tool_jq.erl
       bc_tool_read_file.erl
       bc_tool_write_file.erl
-      bc_tool_workspace_memory.erl  %% agent MEMORY.md + daily logs read/append/replace
+      bc_tool_workspace_memory.erl  %% agent MEMORY.md + daily logs + bootstrap files
       bc_workspace_path.erl         %% pure path resolution + memory dir (avoids dep cycle)
     beamclaw_mcp/src/
       beamclaw_mcp.app.src

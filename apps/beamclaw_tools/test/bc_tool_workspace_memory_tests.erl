@@ -200,3 +200,98 @@ append_daily_no_content_test() ->
                           agent_id = <<"any">>},
     ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
         #{<<"action">> => <<"append_daily">>}, Ref, #{})).
+
+%% ---- read_bootstrap ----
+
+read_bootstrap_test_() -> ?setup(read_bootstrap_t).
+read_bootstrap_t(TmpDir) ->
+    Ref = session_ref(),
+    %% Write IDENTITY.md for the test agent
+    AgentDir = filename:join([TmpDir, "agents", "test-agent"]),
+    ok = file:write_file(filename:join(AgentDir, "IDENTITY.md"),
+                         <<"# Identity\n\n- **Name:** TestBot\n">>),
+    {ok, Content} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"read_bootstrap">>, <<"file">> => <<"IDENTITY.md">>}, Ref, #{}),
+    [?_assert(binary:match(Content, <<"TestBot">>) =/= nomatch)].
+
+%% ---- read_bootstrap missing file ----
+
+read_bootstrap_missing_test_() -> ?setup(read_bootstrap_missing_t).
+read_bootstrap_missing_t(_TmpDir) ->
+    Ref = session_ref(),
+    {ok, Content} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"read_bootstrap">>, <<"file">> => <<"SOUL.md">>}, Ref, #{}),
+    [?_assert(binary:match(Content, <<"does not exist">>) =/= nomatch)].
+
+%% ---- update_bootstrap ----
+
+update_bootstrap_test_() -> ?setup(update_bootstrap_t).
+update_bootstrap_t(_TmpDir) ->
+    Ref = session_ref(),
+    NewContent = <<"# Identity\n\n- **Name:** Sparky\n- **Creature:** Fox\n">>,
+    {ok, Msg} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"update_bootstrap">>,
+          <<"file">> => <<"IDENTITY.md">>,
+          <<"content">> => NewContent}, Ref, #{}),
+    %% Read it back
+    {ok, ReadBack} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"read_bootstrap">>, <<"file">> => <<"IDENTITY.md">>}, Ref, #{}),
+    [?_assertEqual(<<"IDENTITY.md updated.">>, Msg),
+     ?_assertEqual(NewContent, ReadBack)].
+
+%% ---- update_bootstrap all allowed files ----
+
+update_bootstrap_allowed_files_test_() -> ?setup(update_bootstrap_allowed_t).
+update_bootstrap_allowed_t(_TmpDir) ->
+    Ref = session_ref(),
+    Files = [<<"IDENTITY.md">>, <<"USER.md">>, <<"SOUL.md">>,
+             <<"TOOLS.md">>, <<"AGENTS.md">>],
+    Results = lists:map(fun(F) ->
+        {ok, Msg} = bc_tool_workspace_memory:execute(
+            #{<<"action">> => <<"update_bootstrap">>,
+              <<"file">> => F,
+              <<"content">> => <<"test content for ", F/binary>>}, Ref, #{}),
+        Msg
+    end, Files),
+    [?_assertEqual(5, length(Results))].
+
+%% ---- update_bootstrap rejects disallowed files ----
+
+update_bootstrap_reject_test() ->
+    Ref = #bc_session_ref{session_id = <<"x">>, user_id = <<"u">>,
+                          session_pid = self(), autonomy = supervised,
+                          agent_id = <<"any">>},
+    %% MEMORY.md should be rejected (use read/append/replace instead)
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"update_bootstrap">>,
+          <<"file">> => <<"MEMORY.md">>,
+          <<"content">> => <<"test">>}, Ref, #{})),
+    %% BOOTSTRAP.md should be rejected
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"update_bootstrap">>,
+          <<"file">> => <<"BOOTSTRAP.md">>,
+          <<"content">> => <<"test">>}, Ref, #{})),
+    %% Random file should be rejected
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"update_bootstrap">>,
+          <<"file">> => <<"../../etc/passwd">>,
+          <<"content">> => <<"test">>}, Ref, #{})).
+
+%% ---- read_bootstrap missing file param ----
+
+read_bootstrap_no_file_test() ->
+    Ref = #bc_session_ref{session_id = <<"x">>, user_id = <<"u">>,
+                          session_pid = self(), autonomy = supervised,
+                          agent_id = <<"any">>},
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"read_bootstrap">>}, Ref, #{})).
+
+%% ---- update_bootstrap missing content ----
+
+update_bootstrap_no_content_test() ->
+    Ref = #bc_session_ref{session_id = <<"x">>, user_id = <<"u">>,
+                          session_pid = self(), autonomy = supervised,
+                          agent_id = <<"any">>},
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"update_bootstrap">>,
+          <<"file">> => <<"IDENTITY.md">>}, Ref, #{})).

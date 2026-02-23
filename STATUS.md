@@ -6,7 +6,9 @@ Scaffolding is complete. All seven OTP apps compile clean with zero warnings.
 Multi-agent workspaces (M11–M13), rich templates (M14), daily logs (M15),
 skill system (M16–M17), session persistence (M18), cross-channel session
 sharing (M19), Telegram pairing access control (M20), and typing indicators
-(Post-M20) are complete. Cross-channel session fix applied. 192 EUnit tests pass.
+(Post-M20) are complete. Cross-channel session fix applied. Workspace memory
+bootstrap file routing and pre-compaction memory flush (Post-M20) added.
+200 EUnit tests pass.
 
 ---
 
@@ -389,6 +391,21 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 
 ---
 
+### Post-M20 — Workspace Memory: Bootstrap File Routing + Memory Flush ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `bc_tool_workspace_memory` bootstrap actions | ✅ | `read_bootstrap`/`update_bootstrap` with `file` param; allowlist: IDENTITY/USER/SOUL/TOOLS/AGENTS |
+| AGENTS.md template: file routing table | ✅ | Explicit routing rules for identity/user/soul/tools/memory/daily |
+| AGENTS.md template: memory review cycle | ✅ | Daily logs as inbox, MEMORY.md as archive; promote/prune guidance |
+| MEMORY.md template: "What Does NOT Belong Here" | ✅ | Redirects identity/user/personality info to correct files |
+| `bc_loop` pre-compaction memory flush | ✅ | Hidden LLM turn before compaction; executes workspace_memory tool calls |
+| `memory_flush` config key | ✅ | `agentic_loop` map; default `true`; both sys.config files |
+| EUnit tests | ✅ | 8 new tests (26 total for bc_tool_workspace_memory_tests); 200 total |
+| Docs update | ✅ | CLAUDE.md, architecture.md, configuration.md |
+
+---
+
 ## Known Issues / Blockers
 
 _None at this time._
@@ -397,4 +414,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-22 (Docker CLI control — Post-M20)
+2026-02-23 (Workspace memory bootstrap routing + memory flush — Post-M20)
