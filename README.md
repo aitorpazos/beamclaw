@@ -134,4 +134,4 @@ supervisor-restarted crashes never lose history. See [docs/architecture.md](docs
 
 ## License
 
-MIT
+Apache-2.0
