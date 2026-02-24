@@ -160,7 +160,8 @@ streaming(enter, _OldState, Data) ->
 streaming(cast, do_stream, Data) ->
     History    = bc_session:get_history(Data#loop_data.session_pid),
     SystemMsgs = bc_system_prompt:assemble(Data#loop_data.agent_id),
-    FullHistory = SystemMsgs ++ History,
+    AutoCtxMsgs = maybe_auto_context(History, Data),
+    FullHistory = SystemMsgs ++ AutoCtxMsgs ++ History,
     LoopCfg   = bc_config:get(beamclaw_core, agentic_loop, #{}),
     ChunkSize = maps:get(stream_chunk_size, LoopCfg, 80),
     Tools     = bc_tool_registry:list(),
@@ -446,6 +447,70 @@ get_provider_config(ProviderMod) ->
 generate_id() ->
     <<N:128>> = crypto:strong_rand_bytes(16),
     iolist_to_binary(io_lib:format("~32.16.0b", [N])).
+
+%% Optional auto-context: BM25-only search of structured memory using
+%% user's latest message, prepended as a system message.
+%% Gated by `auto_context => true` in agentic_loop config (default: false).
+maybe_auto_context(History, Data) ->
+    LoopCfg = bc_config:get(beamclaw_core, agentic_loop, #{}),
+    case maps:get(auto_context, LoopCfg, false) of
+        true ->
+            Limit = maps:get(auto_context_limit, LoopCfg, 3),
+            case last_user_content(History) of
+                undefined -> [];
+                UserText  ->
+                    try auto_context_search(UserText, Limit, Data)
+                    catch _:_ -> []
+                    end
+            end;
+        false ->
+            []
+    end.
+
+last_user_content(History) ->
+    UserMsgs = [M || M <- lists:reverse(History),
+                     M#bc_message.role =:= user,
+                     M#bc_message.content =/= undefined],
+    case UserMsgs of
+        [Last | _] -> Last#bc_message.content;
+        []         -> undefined
+    end.
+
+auto_context_search(Query, Limit, Data) ->
+    %% Use workspace memory search (BM25 only, no embedding API call)
+    AgentId = Data#loop_data.agent_id,
+    MemPath = bc_workspace_path:bootstrap_file(AgentId, <<"MEMORY.md">>),
+    Chunks = case file:read_file(MemPath) of
+        {ok, Bin} when byte_size(Bin) > 0 ->
+            Paragraphs = re:split(Bin, <<"\\n\\n+">>, [{return, binary}]),
+            [{iolist_to_binary(io_lib:format("[MEMORY.md:para ~B]", [I])),
+              string:trim(P)}
+             || {I, P} <- lists:zip(lists:seq(1, length(Paragraphs)), Paragraphs),
+                string:trim(P) =/= <<>>];
+        _ -> []
+    end,
+    case Chunks of
+        [] -> [];
+        _ ->
+            Ranked = bc_bm25:rank(Query, Chunks),
+            Top = lists:sublist(Ranked, Limit),
+            case Top of
+                [] -> [];
+                _ ->
+                    ChunkMap = maps:from_list(Chunks),
+                    Entries = [maps:get(K, ChunkMap, <<>>) || {K, _} <- Top],
+                    Content = iolist_to_binary([
+                        <<"[Relevant memories]\n">>,
+                        lists:join(<<"\n---\n">>, Entries)
+                    ]),
+                    [#bc_message{
+                        id      = generate_id(),
+                        role    = system,
+                        content = Content,
+                        ts      = erlang:system_time(millisecond)
+                    }]
+            end
+    end.
 
 %% Pre-compaction memory flush: ask the LLM to save durable memories before
 %% history is compacted. This is a hidden turn — not routed to the user.

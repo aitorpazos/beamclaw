@@ -44,7 +44,7 @@ compact(SessionPid) ->
         true -> ok;
         false ->
             {OldMsgs, KeepMsgs} = lists:split(Before - Target, History),
-            NewHistory = case summarize(OldMsgs) of
+            {NewHistory, MaybeSummary} = case summarize(OldMsgs) of
                 {ok, Summary} ->
                     SummaryMsg = #bc_message{
                         id      = generate_id(),
@@ -52,15 +52,16 @@ compact(SessionPid) ->
                         content = <<?SUMMARY_PREFIX/binary, Summary/binary>>,
                         ts      = erlang:system_time(millisecond)
                     },
-                    [SummaryMsg | KeepMsgs];
+                    {[SummaryMsg | KeepMsgs], Summary};
                 error ->
                     %% Fallback: deterministic trim
-                    KeepMsgs
+                    {KeepMsgs, undefined}
             end,
             After = length(NewHistory),
             bc_session:set_history(SessionPid, NewHistory),
             bc_obs:emit(compaction_complete,
                         #{before => Before, 'after' => After}),
+            maybe_embed_summary(MaybeSummary),
             ok
     end.
 
@@ -113,3 +114,17 @@ get_provider_config(ProvMod) ->
 generate_id() ->
     <<N:64>> = crypto:strong_rand_bytes(8),
     iolist_to_binary(io_lib:format("msg_~16.16.0b", [N])).
+
+%% Fire-and-forget: embed the compaction summary for future semantic search.
+maybe_embed_summary(undefined) -> ok;
+maybe_embed_summary(Summary) when is_binary(Summary) ->
+    case bc_embedding:is_configured() of
+        true ->
+            spawn(fun() ->
+                try bc_embedding:embed(Summary)
+                catch _:_ -> ok
+                end
+            end);
+        false ->
+            ok
+    end.

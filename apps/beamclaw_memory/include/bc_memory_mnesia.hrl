@@ -25,5 +25,6 @@
     value      :: term(),
     category   :: core | daily | conversation | custom,
     created_at :: non_neg_integer(),
-    updated_at :: non_neg_integer()
+    updated_at :: non_neg_integer(),
+    embedding  :: [float()] | undefined
 }).

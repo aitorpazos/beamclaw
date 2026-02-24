@@ -25,7 +25,7 @@ owning process (bc_session) terminates. Use bc_memory_sqlite for persistence.
 """.
 -behaviour(bc_memory).
 
--export([init/2, store/4, recall/4, get/2, forget/2]).
+-export([init/2, store/4, recall/4, get/2, forget/2, search/4]).
 
 %% ---------------------------------------------------------------------------
 %% bc_memory callbacks
@@ -54,14 +54,23 @@ store(Key, Value, Category, #{tab := Tab} = State) ->
 
 recall(Query, Limit, Category, #{tab := Tab} = State) ->
     All = ets:tab2list(Tab),
-    Filtered = [E || {_, E} <- All,
-                     category_matches(maps:get(category, E), Category),
-                     query_matches(Query, E)],
-    %% Return most-recently-updated entries first.
-    Sorted = lists:sort(fun(A, B) ->
-        maps:get(updated_at, A) >= maps:get(updated_at, B)
-    end, Filtered),
-    {ok, lists:sublist(Sorted, Limit), State}.
+    CatFiltered = [E || {_, E} <- All,
+                        category_matches(maps:get(category, E), Category)],
+    case is_meaningful_query(Query) of
+        false ->
+            %% No query: return most-recently-updated entries.
+            Sorted = lists:sort(fun(A, B) ->
+                maps:get(updated_at, A) >= maps:get(updated_at, B)
+            end, CatFiltered),
+            {ok, lists:sublist(Sorted, Limit), State};
+        true ->
+            %% BM25 keyword search.
+            Docs = [{maps:get(key, E), to_searchable_text(E)} || E <- CatFiltered],
+            Ranked = bc_bm25:rank(Query, Docs),
+            ByKey = maps:from_list([{maps:get(key, E), E} || E <- CatFiltered]),
+            Results = [maps:get(K, ByKey) || {K, _Score} <- lists:sublist(Ranked, Limit)],
+            {ok, Results, State}
+    end.
 
 get(Key, #{tab := Tab}) ->
     case ets:lookup(Tab, Key) of
@@ -73,6 +82,15 @@ forget(Key, #{tab := Tab} = State) ->
     ets:delete(Tab, Key),
     {ok, State}.
 
+search(Query, Limit, _Options, #{tab := Tab} = State) ->
+    All = ets:tab2list(Tab),
+    Docs = [{maps:get(key, E), to_searchable_text(E)} || {_, E} <- All],
+    Ranked = bc_bm25:rank(Query, Docs),
+    ByKey = maps:from_list([{maps:get(key, E), E} || {_, E} <- All]),
+    Results = [{Score, maps:get(K, ByKey)}
+               || {K, Score} <- lists:sublist(Ranked, Limit)],
+    {ok, Results, State}.
+
 %% ---------------------------------------------------------------------------
 %% Internal helpers
 %% ---------------------------------------------------------------------------
@@ -81,5 +99,15 @@ category_matches(_C, all) -> true;
 category_matches(C,  C)   -> true;
 category_matches(_C, _)   -> false.
 
-%% Full-text search is not implemented for the ETS backend; all entries pass.
-query_matches(_, _) -> true.
+is_meaningful_query(<<>>)      -> false;
+is_meaningful_query(undefined)  -> false;
+is_meaningful_query(all)        -> false;
+is_meaningful_query(B) when is_binary(B), byte_size(B) > 0 -> true;
+is_meaningful_query(_)          -> false.
+
+to_searchable_text(Entry) ->
+    Key = maps:get(key, Entry, <<>>),
+    Value = maps:get(value, Entry, <<>>),
+    KeyBin = if is_binary(Key) -> Key; true -> iolist_to_binary(io_lib:format("~p", [Key])) end,
+    ValBin = if is_binary(Value) -> Value; true -> iolist_to_binary(io_lib:format("~p", [Value])) end,
+    <<KeyBin/binary, " ", ValBin/binary>>.

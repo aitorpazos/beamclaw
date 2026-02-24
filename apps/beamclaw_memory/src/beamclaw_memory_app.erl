@@ -23,6 +23,7 @@
 
 start(_StartType, _StartArgs) ->
     ok = init_mnesia(),
+    ok = maybe_transform_table(),
     beamclaw_memory_sup:start_link().
 
 stop(_State) ->
@@ -64,4 +65,19 @@ ensure_tables() ->
             {type, set}]) of
         {atomic, ok}                   -> ok;
         {aborted, {already_exists, _}} -> ok
+    end.
+
+%% Add the `embedding` column to existing tables created before M22.
+%% mnesia:transform_table/3 is idempotent when the attributes already match.
+maybe_transform_table() ->
+    Expected = record_info(fields, bc_memory_entry_stored),
+    Current  = mnesia:table_info(bc_memory_entries, attributes),
+    case Current =:= Expected of
+        true  -> ok;
+        false ->
+            Transform = fun({bc_memory_entry_stored, Key, Value, Cat, CreatedAt, UpdatedAt}) ->
+                {bc_memory_entry_stored, Key, Value, Cat, CreatedAt, UpdatedAt, undefined}
+            end,
+            {atomic, ok} = mnesia:transform_table(bc_memory_entries, Transform, Expected),
+            ok
     end.

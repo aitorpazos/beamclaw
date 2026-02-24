@@ -22,6 +22,9 @@ resolved at runtime by `bc_config:get/2` via `os:getenv/1`.
 | `BEAMCLAW_HOME` | No | Override workspace base directory (default: `~/.beamclaw`) |
 | `BEAMCLAW_AGENT` | No | Default agent name for TUI sessions (default: `default`) |
 | `BEAMCLAW_USER` | No | Canonical user identity for cross-channel session sharing. When set, all channels (TUI, Telegram, HTTP, WebSocket) use this value as-is (no prefix), enabling a single shared session across channels. When unset, each channel prefixes user IDs independently. |
+| `BEAMCLAW_EMBEDDING_API_KEY` | No | API key for the embedding service (OpenAI-compatible). When unset, semantic/hybrid search degrades to BM25 keyword-only. |
+| `BEAMCLAW_EMBEDDING_URL` | No | Base URL for the embedding API (default: `https://api.openai.com/v1`). Supports OpenAI, Azure OpenAI, Ollama, or any OpenAI-compatible endpoint. |
+| `BEAMCLAW_EMBEDDING_MODEL` | No | Embedding model name (default: `text-embedding-3-small`). |
 
 At least one of `OPENROUTER_API_KEY` or `OPENAI_API_KEY` must be set, depending on
 `default_provider`.
@@ -67,7 +70,13 @@ them to a file — `.env` and `*.secret` files are excluded by `.gitignore`.
         stream_chunk_size    => 80,
         %% Pre-compaction memory flush: fire a hidden LLM turn before compacting
         %% to let the agent save durable memories to workspace files.
-        memory_flush         => true
+        memory_flush         => true,
+        %% Auto-context: BM25 search of MEMORY.md before each LLM call.
+        %% Injects top matching snippets as context. Off by default to
+        %% avoid unnecessary token usage.
+        auto_context         => false,
+        %% Maximum number of auto-context snippets to inject per turn.
+        auto_context_limit   => 3
     }},
 
     %% Default autonomy level for new sessions.
@@ -158,7 +167,38 @@ to the agentic loop.
     %% ets    — ephemeral in-process ETS table; lost on restart (default).
     %% mnesia — persistent Mnesia table (disc_copies when schema exists,
     %%           ram_copies in dev/test).
-    {backend, ets}
+    {backend, ets},
+
+    %% Embedding configuration for semantic search.
+    %% When enabled and an API key is set, memory entries and workspace
+    %% text are embedded for vector similarity search. When disabled or
+    %% unconfigured, search degrades gracefully to BM25 keyword-only.
+    {embedding, #{
+        enabled    => true,
+        model      => {env, "BEAMCLAW_EMBEDDING_MODEL"},   %% default: text-embedding-3-small
+        base_url   => {env, "BEAMCLAW_EMBEDDING_URL"},     %% default: https://api.openai.com/v1
+        api_key    => {env, "BEAMCLAW_EMBEDDING_API_KEY"}, %% required for semantic search
+        dimensions => 1536                                  %% embedding vector size
+    }},
+
+    %% Search tuning parameters.
+    {search, #{
+        %% Hybrid score weights (must sum to 1.0).
+        vector_weight     => 0.6,
+        bm25_weight       => 0.4,
+        %% Minimum hybrid score to include a result.
+        min_score         => 0.1,
+        %% Default number of results returned by search actions.
+        default_limit     => 5,
+        %% Text chunking for embedding: words per chunk and overlap.
+        chunk_size        => 200,
+        chunk_overlap     => 50,
+        %% Workspace files to index for search_all action.
+        workspace_files   => [<<"MEMORY.md">>, <<"SOUL.md">>, <<"IDENTITY.md">>,
+                              <<"USER.md">>, <<"TOOLS.md">>, <<"AGENTS.md">>],
+        %% Number of past daily logs to include in search_all.
+        daily_log_lookback => 7
+    }}
 ]}
 ```
 

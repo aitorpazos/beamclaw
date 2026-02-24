@@ -40,3 +40,9 @@ See bc_memory_ets and bc_memory_mnesia for reference implementations.
 
 -callback forget(Key :: term(), State :: term()) ->
     {ok, NewState :: term()} | {error, term()}.
+
+-callback search(Query :: binary(), Limit :: pos_integer(),
+                 Options :: map(), State :: term()) ->
+    {ok, [{Score :: float(), Entry :: term()}], NewState :: term()} | {error, term()}.
+
+-optional_callbacks([search/4]).

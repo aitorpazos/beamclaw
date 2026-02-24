@@ -8,7 +8,8 @@ skill system (M16–M17), session persistence (M18), cross-channel session
 sharing (M19), Telegram pairing access control (M20), and typing indicators
 (Post-M20) are complete. Cross-channel session fix applied. Workspace memory
 bootstrap file routing and pre-compaction memory flush (Post-M20) added.
-200 EUnit tests pass.
+Memory search with BM25 + vector hybrid (M21–M23) is complete.
+283 EUnit tests pass.
 
 ---
 
@@ -425,6 +426,46 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | `README.md` update | ✅ | Docker quick-start uses compose as primary method |
 | `docs/running.md` update | ✅ | Docker Compose subsection under Mode 3 |
 
+### M21 — BM25 Keyword Search ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_bm25` | ✅ | Pure-function BM25: tokenize, TF-IDF, corpus_stats, score, rank |
+| `bc_memory` behaviour update | ✅ | Added optional `search/4` callback |
+| `bc_memory_ets` BM25 recall | ✅ | Replaced `query_matches` stub with BM25 scoring |
+| `bc_memory_mnesia` BM25 recall | ✅ | Same BM25 scoring for Mnesia backend |
+| `bc_tool_workspace_memory` search action | ✅ | BM25 search across MEMORY.md + daily logs |
+| EUnit tests | ✅ | 14 (bc_bm25_tests) + 6 (bc_memory_ets_search_tests) + 4 (workspace search) |
+
+### M22 — Vector Semantic Search + Hybrid Merge ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_vector` | ✅ | Cosine similarity, L2 normalize, dot product |
+| `bc_chunker` | ✅ | Overlapping word-boundary text chunking |
+| `bc_hybrid` | ✅ | Min-max normalize, weighted BM25+vector merge, min_score filter |
+| `bc_embedding` | ✅ | OpenAI-compatible embedding API client via httpc |
+| `bc_embedding_cache` | ✅ | gen_server, ETS cache with 24h TTL, agent invalidation |
+| `bc_memory_mnesia.hrl` update | ✅ | Added `embedding :: [float()] | undefined` field |
+| `beamclaw_memory_app` migration | ✅ | `maybe_transform_table/0` adds embedding column |
+| `beamclaw_memory_sup` update | ✅ | `bc_embedding_cache` as permanent child |
+| `bc_tool_workspace_memory` hybrid | ✅ | `mode` param: keyword/semantic/hybrid (default) |
+| Config updates | ✅ | `embedding` + `search` maps in sys.config |
+| EUnit tests | ✅ | 11 (vector) + 6 (chunker) + 7 (hybrid) + 6 (embedding_cache) + 6 (embedding) |
+
+### M23 — Loop Integration + Search Polish ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_loop` auto-context | ✅ | Optional BM25 search of MEMORY.md before LLM call; `auto_context => false` default |
+| `bc_tool_workspace_memory` search_all | ✅ | Cross-source search: all bootstrap files + daily logs |
+| `bc_tool_workspace_memory` attribution | ✅ | Source + relevance % in results; truncated snippets |
+| `bc_compactor` async embed | ✅ | Fire-and-forget embed of compaction summary |
+| Config updates | ✅ | `auto_context`, `auto_context_limit`, `workspace_files`, `daily_log_lookback` |
+| ADR-014 | ✅ | Pure Erlang BM25 + embedding hybrid search |
+| Docs update | ✅ | CLAUDE.md, architecture.md, configuration.md, running.md |
+| EUnit tests | ✅ | 4 (search_all + keyword mode) |
+
 ---
 
 ## Known Issues / Blockers
@@ -435,4 +476,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-24 (Docker Compose — Post-M20)
+2026-02-24 (Memory Search BM25 + Vector Hybrid — M21–M23)

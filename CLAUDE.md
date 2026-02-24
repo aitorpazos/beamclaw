@@ -211,6 +211,15 @@ beamclaw_obs_sup  (one_for_one)
 
 `bc_obs:emit/2` is a non-blocking cast. Observability **never** creates backpressure on the agentic loop.
 
+### `beamclaw_memory`
+
+```
+beamclaw_memory_sup  (one_for_one)
+  └── bc_embedding_cache     (gen_server, permanent — ETS embedding cache, 24h TTL)
+```
+
+Other search modules (`bc_bm25`, `bc_vector`, `bc_chunker`, `bc_hybrid`, `bc_embedding`) are pure-function or stateless — no supervision needed.
+
 ---
 
 ## Key Behaviours
@@ -274,9 +283,15 @@ Implementations: `bc_channel_telegram`, `bc_channel_tui`.
     {ok, [bc_memory_entry()], State} | {error, term()}.
 -callback get(Key, State) -> {ok, bc_memory_entry()} | {error, not_found | term()}.
 -callback forget(Key, State) -> {ok, State} | {error, term()}.
+-callback search(Query :: binary(), Limit :: pos_integer(),
+                 Options :: map(), State :: term()) ->
+    {ok, [{Score :: float(), Entry :: term()}], NewState :: term()} | {error, term()}.
+-optional_callbacks([search/4]).
 ```
 
 Implementations: `bc_memory_ets`, `bc_memory_mnesia`.
+
+Search modules (all in `beamclaw_memory`): `bc_bm25` (BM25 scoring), `bc_vector` (cosine similarity), `bc_chunker` (text chunking), `bc_hybrid` (score merging), `bc_embedding` (API client), `bc_embedding_cache` (ETS cache gen_server).
 
 ### `bc_observer` — Observability backend abstraction (`beamclaw_obs`)
 
@@ -490,7 +505,9 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
                      compaction_threshold => 50,
                      compaction_target    => 20,
                      stream_chunk_size    => 80,
-                     memory_flush         => true}},
+                     memory_flush         => true,
+                     auto_context         => false,
+                     auto_context_limit   => 3}},
     {autonomy_level, supervised},
     {session_ttl_seconds, 3600},
     {default_agent, <<"default">>},
@@ -512,7 +529,16 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
 ]},
 {beamclaw_obs, []},
 {beamclaw_memory, [
-    {backend, ets}
+    {backend, ets},
+    {embedding, #{enabled => true, model => "text-embedding-3-small",
+                  base_url => "https://api.openai.com/v1",
+                  api_key => {env, "BEAMCLAW_EMBEDDING_API_KEY"},
+                  dimensions => 1536}},
+    {search, #{vector_weight => 0.7, bm25_weight => 0.3,
+               min_score => 0.35, default_limit => 6,
+               chunk_size => 400, chunk_overlap => 80,
+               workspace_files => [<<"MEMORY.md">>, ...],
+               daily_log_lookback => 7}}
 ]}
 ```
 
@@ -584,13 +610,22 @@ beamclaw/
       bc_obs.erl              %% behaviour + emit/2 API
       bc_obs_manager.erl      %% fan-out gen_server
       bc_obs_log.erl          %% log backend
-    beamclaw_memory/src/
-      beamclaw_memory.app.src
-      beamclaw_memory_app.erl
-      beamclaw_memory_sup.erl
-      bc_memory.erl           %% behaviour
-      bc_memory_ets.erl
-      bc_memory_mnesia.erl
+    beamclaw_memory/
+      include/
+        bc_memory_mnesia.hrl  %% Mnesia record (with embedding field)
+      src/
+        beamclaw_memory.app.src
+        beamclaw_memory_app.erl
+        beamclaw_memory_sup.erl
+        bc_memory.erl           %% behaviour (incl. optional search/4)
+        bc_memory_ets.erl
+        bc_memory_mnesia.erl
+        bc_bm25.erl             %% BM25 keyword search (pure function)
+        bc_vector.erl           %% cosine similarity, dot product (pure function)
+        bc_chunker.erl          %% text chunking for embeddings (pure function)
+        bc_hybrid.erl           %% BM25 + vector score merging (pure function)
+        bc_embedding.erl        %% OpenAI-compatible embedding API client
+        bc_embedding_cache.erl  %% gen_server, ETS embedding cache (24h TTL)
     beamclaw_tools/src/
       beamclaw_tools.app.src
       beamclaw_tools_app.erl
@@ -603,7 +638,7 @@ beamclaw/
       bc_tool_jq.erl
       bc_tool_read_file.erl
       bc_tool_write_file.erl
-      bc_tool_workspace_memory.erl  %% agent MEMORY.md + daily logs + bootstrap files
+      bc_tool_workspace_memory.erl  %% agent MEMORY.md + daily logs + bootstrap files + search
       bc_workspace_path.erl         %% pure path resolution + memory dir (avoids dep cycle)
     beamclaw_mcp/src/
       beamclaw_mcp.app.src

@@ -24,4 +24,11 @@ start_link() ->
 
 init([]) ->
     SupFlags = #{strategy => one_for_one, intensity => 5, period => 30},
-    {ok, {SupFlags, []}}.
+    EmbeddingCache = #{
+        id       => bc_embedding_cache,
+        start    => {bc_embedding_cache, start_link, []},
+        restart  => permanent,
+        type     => worker,
+        shutdown => 5000
+    },
+    {ok, {SupFlags, [EmbeddingCache]}}.

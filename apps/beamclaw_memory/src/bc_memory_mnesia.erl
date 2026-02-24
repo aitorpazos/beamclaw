@@ -33,12 +33,12 @@ of the ETS backend. Upgrade to transactions if strict consistency is needed.
 
 -include("bc_memory_mnesia.hrl").
 
--export([init/2, store/4, recall/4, get/2, forget/2]).
+-export([init/2, store/4, recall/4, get/2, forget/2, search/4]).
 
 %% Mnesia dirty_match_object uses record fields set to the atom '_' as wildcards.
 %% This is a Mnesia runtime convention that Dialyzer's type system cannot model,
 %% so we suppress the resulting spurious warnings for the affected functions.
--dialyzer({nowarn_function, [recall/4, query_matches/2]}).
+-dialyzer({nowarn_function, [recall/4, search/4]}).
 
 %% ---------------------------------------------------------------------------
 %% bc_memory callbacks
@@ -55,7 +55,8 @@ store(Key, Value, Category, #{session_id := SessionId} = State) ->
             Existing#bc_memory_entry_stored{
                 value      = Value,
                 category   = Category,
-                updated_at = Now
+                updated_at = Now,
+                embedding  = undefined  %% invalidate on update
             };
         [] ->
             #bc_memory_entry_stored{
@@ -63,7 +64,8 @@ store(Key, Value, Category, #{session_id := SessionId} = State) ->
                 value      = Value,
                 category   = Category,
                 created_at = Now,
-                updated_at = Now
+                updated_at = Now,
+                embedding  = undefined
             }
     end,
     ok = mnesia:dirty_write(bc_memory_entries, Entry),
@@ -79,11 +81,20 @@ recall(Query, Limit, Category, #{session_id := SessionId} = State) ->
         updated_at = '_'
     },
     Matches  = mnesia:dirty_match_object(bc_memory_entries, Pattern),
-    Filtered = [to_entry(E) || E <- Matches, query_matches(Query, E)],
-    Sorted   = lists:sort(fun(A, B) ->
-        maps:get(updated_at, A) >= maps:get(updated_at, B)
-    end, Filtered),
-    {ok, lists:sublist(Sorted, Limit), State}.
+    Entries  = [to_entry(E) || E <- Matches],
+    case is_meaningful_query(Query) of
+        false ->
+            Sorted = lists:sort(fun(A, B) ->
+                maps:get(updated_at, A) >= maps:get(updated_at, B)
+            end, Entries),
+            {ok, lists:sublist(Sorted, Limit), State};
+        true ->
+            Docs = [{maps:get(key, E), to_searchable_text(E)} || E <- Entries],
+            Ranked = bc_bm25:rank(Query, Docs),
+            ByKey = maps:from_list([{maps:get(key, E), E} || E <- Entries]),
+            Results = [maps:get(K, ByKey) || {K, _Score} <- lists:sublist(Ranked, Limit)],
+            {ok, Results, State}
+    end.
 
 get(Key, #{session_id := SessionId} = _State) ->
     case mnesia:dirty_read(bc_memory_entries, {SessionId, Key}) of
@@ -106,13 +117,41 @@ to_entry(#bc_memory_entry_stored{
             value      = Value,
             category   = Category,
             created_at = CreatedAt,
-            updated_at = UpdatedAt}) ->
+            updated_at = UpdatedAt,
+            embedding  = Embedding}) ->
     #{key        => Key,
       value      => Value,
       category   => Category,
       created_at => CreatedAt,
-      updated_at => UpdatedAt}.
+      updated_at => UpdatedAt,
+      embedding  => Embedding}.
 
-%% Full-text query matching is not implemented for the Mnesia backend;
-%% all entries pass. The category filter is applied via the match pattern above.
-query_matches(_, _) -> true.
+search(Query, Limit, _Options, #{session_id := SessionId} = State) ->
+    Pattern = #bc_memory_entry_stored{
+        key        = {SessionId, '_'},
+        value      = '_',
+        category   = '_',
+        created_at = '_',
+        updated_at = '_'
+    },
+    Matches = mnesia:dirty_match_object(bc_memory_entries, Pattern),
+    Entries = [to_entry(E) || E <- Matches],
+    Docs = [{maps:get(key, E), to_searchable_text(E)} || E <- Entries],
+    Ranked = bc_bm25:rank(Query, Docs),
+    ByKey = maps:from_list([{maps:get(key, E), E} || E <- Entries]),
+    Results = [{Score, maps:get(K, ByKey)}
+               || {K, Score} <- lists:sublist(Ranked, Limit)],
+    {ok, Results, State}.
+
+is_meaningful_query(<<>>)      -> false;
+is_meaningful_query(undefined)  -> false;
+is_meaningful_query(all)        -> false;
+is_meaningful_query(B) when is_binary(B), byte_size(B) > 0 -> true;
+is_meaningful_query(_)          -> false.
+
+to_searchable_text(Entry) ->
+    Key = maps:get(key, Entry, <<>>),
+    Value = maps:get(value, Entry, <<>>),
+    KeyBin = if is_binary(Key) -> Key; true -> iolist_to_binary(io_lib:format("~p", [Key])) end,
+    ValBin = if is_binary(Value) -> Value; true -> iolist_to_binary(io_lib:format("~p", [Value])) end,
+    <<KeyBin/binary, " ", ValBin/binary>>.

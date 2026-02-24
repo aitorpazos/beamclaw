@@ -295,3 +295,95 @@ update_bootstrap_no_content_test() ->
     ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
         #{<<"action">> => <<"update_bootstrap">>,
           <<"file">> => <<"IDENTITY.md">>}, Ref, #{})).
+
+%% ---- search ----
+
+search_memory_test_() -> ?setup(search_memory_t).
+search_memory_t(_TmpDir) ->
+    Ref = session_ref(),
+    %% Replace MEMORY.md with searchable content
+    {ok, _} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"replace">>,
+          <<"content">> => <<"# Memory\n\nErlang OTP is great for concurrency.\n\n"
+                             "Python is good for machine learning.\n\n"
+                             "Rust provides memory safety without garbage collection.">>},
+        Ref, #{}),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search">>, <<"query">> => <<"erlang concurrency">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"MEMORY.md">>) =/= nomatch),
+     ?_assert(binary:match(Result, <<"Erlang">>) =/= nomatch)].
+
+search_no_results_test_() -> ?setup(search_no_results_t).
+search_no_results_t(_TmpDir) ->
+    Ref = session_ref(),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search">>,
+          <<"query">> => <<"quantum computing superconductor">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"No results">>) =/= nomatch)].
+
+search_daily_logs_test_() -> ?setup(search_daily_t).
+search_daily_t(TmpDir) ->
+    Ref = session_ref(),
+    MemDir = filename:join([TmpDir, "agents", "test-agent", "memory"]),
+    ok = file:write_file(filename:join(MemDir, "2026-02-20.md"),
+                         <<"Discussed database architecture and schema design today.">>),
+    ok = file:write_file(filename:join(MemDir, "2026-02-21.md"),
+                         <<"Fixed authentication bug in the login flow.">>),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search">>, <<"query">> => <<"database schema">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"2026-02-20">>) =/= nomatch)].
+
+search_missing_query_test() ->
+    Ref = #bc_session_ref{session_id = <<"x">>, user_id = <<"u">>,
+                          session_pid = self(), autonomy = supervised,
+                          agent_id = <<"any">>},
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search">>}, Ref, #{})).
+
+%% ---- search_all ----
+
+search_all_test_() -> ?setup(search_all_t).
+search_all_t(TmpDir) ->
+    Ref = session_ref(),
+    %% Write some bootstrap files
+    AgentDir = filename:join([TmpDir, "agents", "test-agent"]),
+    ok = file:write_file(filename:join(AgentDir, "IDENTITY.md"),
+                         <<"# Identity\n\nI am a helpful Erlang coding assistant.">>),
+    ok = file:write_file(filename:join(AgentDir, "TOOLS.md"),
+                         <<"# Tools\n\nI can use terminal, bash, and curl.">>),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search_all">>, <<"query">> => <<"erlang coding">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"IDENTITY.md">>) =/= nomatch)].
+
+search_all_with_daily_test_() -> ?setup(search_all_daily_t).
+search_all_daily_t(TmpDir) ->
+    Ref = session_ref(),
+    MemDir = filename:join([TmpDir, "agents", "test-agent", "memory"]),
+    ok = file:write_file(filename:join(MemDir, "2026-02-22.md"),
+                         <<"Explored the supervisor tree structure today.">>),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search_all">>, <<"query">> => <<"supervisor tree">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"2026-02-22">>) =/= nomatch)].
+
+search_all_missing_query_test() ->
+    Ref = #bc_session_ref{session_id = <<"x">>, user_id = <<"u">>,
+                          session_pid = self(), autonomy = supervised,
+                          agent_id = <<"any">>},
+    ?assertMatch({error, _}, bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search_all">>}, Ref, #{})).
+
+%% ---- search with keyword mode (explicit) ----
+
+search_keyword_mode_test_() -> ?setup(search_keyword_mode_t).
+search_keyword_mode_t(_TmpDir) ->
+    Ref = session_ref(),
+    {ok, _} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"replace">>,
+          <<"content">> => <<"# Memory\n\nErlang OTP beam virtual machine.\n\n"
+                             "Python Django web framework.">>},
+        Ref, #{}),
+    {ok, Result} = bc_tool_workspace_memory:execute(
+        #{<<"action">> => <<"search">>,
+          <<"query">> => <<"erlang beam">>,
+          <<"mode">> => <<"keyword">>}, Ref, #{}),
+    [?_assert(binary:match(Result, <<"MEMORY.md">>) =/= nomatch)].

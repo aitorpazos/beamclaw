@@ -222,6 +222,65 @@ Per-agent skills override global skills with the same name:
 2. Global: `~/.beamclaw/skills/*/SKILL.md`
 3. Per-agent (highest): `~/.beamclaw/agents/<name>/skills/*/SKILL.md`
 
+### Memory Search
+
+The agent can search its workspace memory (MEMORY.md, daily logs, bootstrap files) using
+the `workspace_memory` tool's `search` and `search_all` actions.
+
+#### Search modes
+
+| Mode | Description | Requirements |
+|------|-------------|--------------|
+| `keyword` | BM25 keyword search (TF-IDF scoring) | None (pure Erlang, always available) |
+| `semantic` | Vector similarity via embeddings | `BEAMCLAW_EMBEDDING_API_KEY` must be set |
+| `hybrid` | Weighted combination of BM25 + vector scores | `BEAMCLAW_EMBEDDING_API_KEY` must be set |
+
+When semantic or hybrid mode is requested but no embedding API key is configured, search
+degrades gracefully to keyword-only mode.
+
+#### Tool actions
+
+The agent invokes these via the `workspace_memory` tool:
+
+- **`search`** — search MEMORY.md content. Parameters: `query` (required), `limit` (optional,
+  default 5), `mode` (optional: `keyword` | `semantic` | `hybrid`, default `keyword`).
+- **`search_all`** — search across all workspace files (MEMORY.md, bootstrap files, and
+  recent daily logs). Same parameters as `search`.
+
+#### Enabling semantic search
+
+To enable semantic/hybrid search modes, set the embedding API key:
+
+```bash
+export BEAMCLAW_EMBEDDING_API_KEY=sk-...
+```
+
+Optionally configure the endpoint and model (defaults to OpenAI):
+
+```bash
+export BEAMCLAW_EMBEDDING_URL=https://api.openai.com/v1    # or Ollama, Azure, etc.
+export BEAMCLAW_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Any OpenAI-compatible `/v1/embeddings` endpoint is supported. Embeddings are cached in
+ETS with a 24-hour TTL to avoid redundant API calls.
+
+#### Auto-context (optional)
+
+When `auto_context` is enabled in `sys.config` (default: `false`), the agentic loop
+performs a BM25 search of MEMORY.md before each LLM call and injects matching snippets
+as context. This is off by default to keep token usage predictable:
+
+```erlang
+{agentic_loop, #{
+    auto_context       => true,   %% enable auto-context injection
+    auto_context_limit => 3       %% max snippets per turn
+}}
+```
+
+See `docs/configuration.md` for full search tuning parameters (weights, chunk sizes,
+minimum scores).
+
 ### Telegram Pairing (Access Control)
 
 By default, BeamClaw's Telegram channel uses **pairing** to control access.
@@ -297,6 +356,9 @@ Pairing data is stored as JSON files under `~/.beamclaw/pairing/`:
 | `BEAMCLAW_AGENT` | No | Default agent name for TUI (default: `default`) |
 | `BEAMCLAW_USER` | No | Override user identity for session sharing |
 | `BEAMCLAW_HOME` | No | Override workspace base directory (default: `~/.beamclaw`) |
+| `BEAMCLAW_EMBEDDING_API_KEY` | No | API key for embedding service (enables semantic search) |
+| `BEAMCLAW_EMBEDDING_URL` | No | Embedding API base URL (default: `https://api.openai.com/v1`) |
+| `BEAMCLAW_EMBEDDING_MODEL` | No | Embedding model name (default: `text-embedding-3-small`) |
 
 ### Pre-flight check
 

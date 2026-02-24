@@ -29,7 +29,7 @@ The rule: no dependency cycle. `beamclaw_obs` never imports from any sibling.
 | App | OTP role | Key modules |
 |---|---|---|
 | `beamclaw_obs` | Observability fan-out | `bc_obs`, `bc_obs_manager`, `bc_obs_log` |
-| `beamclaw_memory` | Session memory | `bc_memory`, `bc_memory_ets`, `bc_memory_mnesia` |
+| `beamclaw_memory` | Session memory + search | `bc_memory`, `bc_memory_ets`, `bc_memory_mnesia`, `bc_bm25`, `bc_vector`, `bc_chunker`, `bc_hybrid`, `bc_embedding`, `bc_embedding_cache` |
 | `beamclaw_tools` | Tool execution | `bc_tool`, `bc_tool_registry`, built-in tools |
 | `beamclaw_mcp` | MCP protocol | `bc_mcp_server`, `bc_mcp_registry` |
 | `beamclaw_core` | Brain | `bc_session`, `bc_loop`, `bc_provider_*`, `bc_approval`, `bc_scrubber`, `bc_skill_parser`, `bc_skill_discovery`, `bc_skill_eligibility`, `bc_skill_installer` |
@@ -53,6 +53,18 @@ beamclaw_core_sup  (one_for_one)
               ├── bc_provider_X  (gen_server, transient — one per session)
               └── bc_approval    (gen_server, transient — started on demand)
 ```
+
+### beamclaw_memory
+
+```
+beamclaw_memory_sup  (one_for_one)
+  └── bc_embedding_cache     (gen_server, permanent — ETS-backed, 24 h TTL)
+```
+
+`bc_embedding_cache` caches embedding vectors keyed by `{text_hash, model}` to avoid
+redundant API calls. The remaining memory modules (`bc_bm25`, `bc_vector`, `bc_chunker`,
+`bc_hybrid`, `bc_embedding`) are pure-function or stateless — they have no supervised
+processes.
 
 ### beamclaw_mcp
 
@@ -281,9 +293,27 @@ Implementations: `bc_channel_telegram`, `bc_channel_tui`.
     {ok, [bc_memory_entry()], State} | {error, term()}.
 -callback get(Key, State) -> {ok, bc_memory_entry()} | {error, not_found | term()}.
 -callback forget(Key, State) -> {ok, State} | {error, term()}.
+
+%% Optional callback — backends may implement for ranked search:
+-callback search(Query, Limit, Mode, State) ->
+    {ok, [{Score :: float(), bc_memory_entry()}], State} | {error, term()}.
+%% Mode :: keyword | semantic | hybrid
 ```
 
-Implementations: `bc_memory_ets` (default), `bc_memory_mnesia` (persistent).
+Implementations: `bc_memory_ets` (default), `bc_memory_mnesia` (persistent). Both
+implement the optional `search/4` callback with BM25-scored keyword search. The Mnesia
+backend additionally stores an `embedding` field per entry for vector-based semantic search.
+
+#### Search modules (pure-function, no supervised processes)
+
+| Module | Role |
+|---|---|
+| `bc_bm25` | BM25 keyword search: tokenization, TF-IDF scoring, document ranking |
+| `bc_vector` | Cosine similarity, L2 normalization, dot product on float lists |
+| `bc_chunker` | Split text into overlapping word-boundary chunks for embedding |
+| `bc_hybrid` | Merge BM25 + vector scores with configurable weights |
+| `bc_embedding` | HTTP client for OpenAI-compatible `/v1/embeddings` API |
+| `bc_embedding_cache` | gen_server, ETS-backed embedding cache with 24 h TTL |
 
 ---
 

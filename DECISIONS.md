@@ -526,3 +526,97 @@ releases.
   needed for same-user operation.
 - Multi-host distribution is not a goal; the node name `beamclaw@localhost` is
   intentionally local-only.
+
+---
+
+## ADR-014 — Pure Erlang BM25 + embedding hybrid search
+
+**Date**: 2026-02-24
+**Status**: Accepted
+
+### Context
+
+OpenClaw implements memory search using SQLite FTS5 for keyword search and
+sqlite-vec for vector similarity. BeamClaw operates at single-user scale
+(one agent, one user, small corpus) and already avoids SQLite (ADR-010).
+Adding a NIF-based search engine would reintroduce the external dependency
+risk that ADR-010 eliminated.
+
+The agent needs to search its workspace memory (MEMORY.md, daily logs,
+bootstrap files) by relevance rather than exact string match. Three search
+modes are desirable: keyword (works offline, zero deps), semantic (uses
+embeddings for meaning-based recall), and hybrid (combines both).
+
+### Decision
+
+Implement a pure-Erlang search stack inside `beamclaw_memory`:
+
+1. **`bc_bm25`** — pure-function BM25 keyword search: tokenization,
+   TF-IDF scoring, and document ranking. No external dependencies.
+
+2. **`bc_vector`** — cosine similarity, L2 normalization, and dot product
+   operations on Erlang float lists. No NIFs.
+
+3. **`bc_chunker`** — split text into overlapping word-boundary chunks
+   for embedding. Configurable `chunk_size` and `chunk_overlap`.
+
+4. **`bc_hybrid`** — merge BM25 and vector similarity scores with
+   configurable weights (`bm25_weight`, `vector_weight`). When only one
+   signal is available (e.g., no embeddings configured), the available
+   signal is used alone.
+
+5. **`bc_embedding`** — HTTP client for OpenAI-compatible `/v1/embeddings`
+   API. Uses `hackney` (already a project dependency). Supports any
+   OpenAI-compatible endpoint via `BEAMCLAW_EMBEDDING_URL`.
+
+6. **`bc_embedding_cache`** — gen_server with ETS-backed cache. Keys are
+   `{text_hash, model}` tuples. Entries expire after 24 hours. Avoids
+   redundant API calls for unchanged text.
+
+Search is exposed primarily through the `bc_tool_workspace_memory` tool
+(new `search` and `search_all` actions), which the agent invokes
+explicitly. An optional auto-context feature (`auto_context` config key,
+default `false`) performs a BM25 search of MEMORY.md before each LLM call
+and injects matching snippets as context — but this is off by default to
+avoid unnecessary token usage.
+
+The `bc_memory` behaviour gains an optional `search/4` callback. Both
+`bc_memory_ets` and `bc_memory_mnesia` implement it with BM25 scoring.
+`bc_memory_mnesia` additionally stores an `embedding` field per entry
+for vector search when embeddings are configured.
+
+After context compaction, `bc_compactor` asynchronously embeds the
+compaction summary for future semantic recall.
+
+### Rationale
+
+- **Zero external deps for BM25**: tokenization and TF-IDF are ~200 lines
+  of pure Erlang. At single-user corpus sizes (hundreds of entries, not
+  millions), performance is not a concern.
+- **Graceful degradation**: when no embedding API key is configured, search
+  falls back to BM25-only. The system is fully functional without any
+  external embedding service.
+- **OpenAI-compatible endpoint**: supports OpenAI, Azure OpenAI, Ollama,
+  and any other provider exposing the `/v1/embeddings` API. No vendor lock-in.
+- **ETS cache prevents cost runaway**: identical text chunks are not
+  re-embedded within the 24-hour TTL window.
+- **Tool-first design**: the agent explicitly decides when to search
+  (via `workspace_memory search`), rather than injecting context on every
+  turn. This keeps token usage predictable and avoids polluting the context
+  window with irrelevant memories.
+
+### Consequences
+
+- `beamclaw_memory.app.src` now depends on `inets`, `ssl`, and `crypto`
+  (all OTP-bundled) for the embedding HTTP client.
+- `bc_embedding_cache` is a new permanent child of `beamclaw_memory_sup`.
+- The Mnesia `bc_memory_entries` table gains an `embedding` column;
+  `beamclaw_memory_app` includes a `maybe_transform_table/0` migration
+  for existing installations.
+- Three new environment variables: `BEAMCLAW_EMBEDDING_API_KEY`,
+  `BEAMCLAW_EMBEDDING_URL`, `BEAMCLAW_EMBEDDING_MODEL`. All optional;
+  when absent, semantic search is unavailable and hybrid search degrades
+  to keyword-only.
+- BM25 scoring is O(N * M) where N = documents, M = query terms. This is
+  acceptable for single-user workloads (N < 10,000). If corpus size grows
+  significantly, an inverted index or external engine would be needed.
