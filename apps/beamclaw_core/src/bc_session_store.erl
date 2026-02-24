@@ -20,7 +20,8 @@ Session persistence — Mnesia-backed data access layer.
 
 Stores session state (history, user/agent IDs, config) in the bc_session_stored
 Mnesia table. History is serialized via term_to_binary with a version tag
-(currently version 1) for forward compatibility.
+(currently version 2) for forward compatibility. Version 1 records (pre-attachments)
+are migrated on load by appending `attachments = []` to each bc_message.
 
 Storage type: disc_copies when a disc schema exists (production), ram_copies
 otherwise (dev/test). Same pattern as bc_memory_mnesia.
@@ -136,14 +137,21 @@ delete_expired(TTLSeconds) ->
 %% ---------------------------------------------------------------------------
 
 serialize_history(History) ->
-    term_to_binary({1, History}).
+    term_to_binary({2, History}).
 
 deserialize_history(Bin) when is_binary(Bin) ->
     case binary_to_term(Bin) of
-        {1, History} -> History;
-        %% Future: {2, History} -> migrate_v2_to_current(History);
+        {2, History} -> History;
+        {1, History} -> migrate_v1_to_v2(History);
         Other        -> Other  %% fallback: raw term
     end;
 deserialize_history(Other) ->
     %% Already deserialized (e.g. in tests passing raw lists)
     Other.
+
+%% v1 → v2: append attachments = [] to bc_message records (8 fields → 9).
+migrate_v1_to_v2(History) ->
+    [case is_tuple(Msg) andalso tuple_size(Msg) =:= 8 of
+        true  -> erlang:append_element(Msg, []);
+        false -> Msg
+    end || Msg <- History].

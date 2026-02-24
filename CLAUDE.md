@@ -313,7 +313,8 @@ Implementations: `bc_obs_log`.
 -type role()             :: system | user | assistant | tool.
 
 -record(bc_message, {
-    id, role, content, tool_calls = [], tool_call_id, name, ts = 0
+    id, role, content, tool_calls = [], tool_call_id, name, ts = 0,
+    attachments = [] :: [{binary(), binary()}]  %% [{MimeType, Base64Data}]
 }).
 -record(bc_tool_def, {
     name, description, parameters, source
@@ -328,7 +329,8 @@ Implementations: `bc_obs_log`.
     session_id, user_id, session_pid, autonomy, agent_id
 }).
 -record(bc_channel_message, {
-    session_id, user_id, channel, content, raw, ts
+    session_id, user_id, channel, content, raw, ts,
+    reply_pid = undefined, attachments = []
 }).
 -record(bc_memory_entry, {
     key, value, category, created_at, updated_at
@@ -523,7 +525,9 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
     {http, #{port => 18800}},
     {channels, [
         {telegram, #{token => {env, "TELEGRAM_BOT_TOKEN"}, mode => long_poll,
-                     dm_policy => pairing, allow_from => []}},
+                     dm_policy => pairing, allow_from => [],
+                     photo => #{enabled => true,
+                                max_size_bytes => 5242880}}},  %% 5 MB
         {tui,      #{enabled => true}}
     ]}
 ]},
@@ -691,6 +695,7 @@ beamclaw/
       bc_gateway_cowboy.erl
       bc_gateway_channels_sup.erl
       bc_channel_telegram.erl
+      bc_telegram_photo.erl     %% photo extraction, download, base64 encoding
       bc_channel_tui.erl
       bc_http_health_h.erl
       bc_http_metrics_h.erl

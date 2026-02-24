@@ -150,7 +150,12 @@ to the agentic loop.
             dm_policy  => pairing,
             %% Static allowlist of Telegram user IDs (binaries).
             %% Merged with the pairing store — users here are always allowed.
-            allow_from => []
+            allow_from => [],
+            %% Photo/vision support.
+            photo => #{
+                enabled        => true,       %% set false to ignore photos
+                max_size_bytes => 5242880     %% 5 MB; photos over this are skipped
+            }
         }},
         {tui, #{
             enabled => true      %% set false in Docker (sys.docker.config)

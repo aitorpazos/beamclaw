@@ -104,10 +104,11 @@ idle(cast, {run, Message}, Data) ->
     %% append_message is a cast; get_history is a call to the same bc_session
     %% process, so FIFO ordering guarantees the cast is processed first.
     UserMsg = #bc_message{
-        id      = generate_id(),
-        role    = user,
-        content = Message#bc_channel_message.content,
-        ts      = Message#bc_channel_message.ts
+        id          = generate_id(),
+        role        = user,
+        content     = Message#bc_channel_message.content,
+        ts          = Message#bc_channel_message.ts,
+        attachments = Message#bc_channel_message.attachments
     },
     bc_session:append_message(Data#loop_data.session_pid, UserMsg),
     History   = bc_session:get_history(Data#loop_data.session_pid),

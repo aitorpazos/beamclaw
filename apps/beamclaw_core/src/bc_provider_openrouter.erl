@@ -22,6 +22,7 @@
 
 -export([start_link/1]).
 -export([init/1, complete/3, stream/4, capabilities/1, terminate/2]).
+-export([message_to_map/1]).
 
 start_link(Config) ->
     %% Providers run as gen_servers; this is the entry point from bc_session_sup.
@@ -80,9 +81,22 @@ build_request_body(Messages, Options, #{model := Model} = _State, Stream) ->
             jsx:encode(Base#{tools => [tool_def_to_map(T) || T <- ToolDefs]})
     end.
 
-message_to_map(#bc_message{role = Role, content = Content}) ->
-    #{role    => atom_to_binary(Role, utf8),
-      content => case Content of undefined -> <<"">>;  _ -> Content end}.
+message_to_map(#bc_message{role = Role, content = Content, attachments = Att}) ->
+    RoleBin = atom_to_binary(Role, utf8),
+    TextContent = case Content of undefined -> <<"">>; _ -> Content end,
+    case Att of
+        [_ | _] when Role =:= user ->
+            TextPart = #{<<"type">> => <<"text">>, <<"text">> => TextContent},
+            ImageParts = [attachment_to_part(A) || A <- Att],
+            #{role => RoleBin, content => [TextPart | ImageParts]};
+        _ ->
+            #{role => RoleBin, content => TextContent}
+    end.
+
+attachment_to_part({MimeType, Base64Data}) ->
+    DataUrl = <<"data:", MimeType/binary, ";base64,", Base64Data/binary>>,
+    #{<<"type">> => <<"image_url">>,
+      <<"image_url">> => #{<<"url">> => DataUrl}}.
 
 tool_def_to_map(#{name := N, description := D, parameters := P}) ->
     #{type => <<"function">>,

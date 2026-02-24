@@ -37,7 +37,8 @@
     tool_calls    = [] :: list(),
     tool_call_id  :: binary() | undefined,
     name          :: binary() | undefined,
-    ts            = 0 :: non_neg_integer()
+    ts            = 0 :: non_neg_integer(),
+    attachments   = [] :: [{binary(), binary()}]  %% [{MimeType, Base64Data}]
 }).
 
 %% A tool definition (name, description, JSON schema for parameters).
@@ -78,14 +79,15 @@
 %% {bc_done, SessionId, Msg} directly to this pid instead of routing via
 %% the named channel gen_server. Used by HTTP and WebSocket handlers.
 -record(bc_channel_message, {
-    session_id :: binary(),
-    user_id    :: binary(),
-    agent_id   = undefined :: binary() | undefined,
-    channel    :: atom(),
-    content    :: binary(),
-    raw        :: term(),
-    ts         :: non_neg_integer(),
-    reply_pid  = undefined :: pid() | undefined
+    session_id  :: binary(),
+    user_id     :: binary(),
+    agent_id    = undefined :: binary() | undefined,
+    channel     :: atom(),
+    content     :: binary(),
+    raw         :: term(),
+    ts          :: non_neg_integer(),
+    reply_pid   = undefined :: pid() | undefined,
+    attachments = [] :: [{binary(), binary()}]  %% [{MimeType, Base64Data}]
 }).
 
 %% A stored memory entry.

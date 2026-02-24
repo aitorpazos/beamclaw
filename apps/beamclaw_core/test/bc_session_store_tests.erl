@@ -42,7 +42,9 @@ session_store_test_() ->
         fun save_updates_existing/0,
         fun delete_session/0,
         fun delete_expired/0,
-        fun history_serialization_preserves_records/0
+        fun history_serialization_preserves_records/0,
+        fun history_v1_to_v2_migration/0,
+        fun history_v2_roundtrip_with_attachments/0
     ]}.
 
 save_and_load_roundtrip() ->
@@ -138,3 +140,46 @@ history_serialization_preserves_records() ->
     ?assertEqual([{name, <<"test">>}], M3#bc_message.tool_calls),
     ?assertEqual(tool, M4#bc_message.role),
     ?assertEqual(<<"tc1">>, M4#bc_message.tool_call_id).
+
+history_v1_to_v2_migration() ->
+    %% Simulate a v1-serialized history (8-element bc_message tuples without attachments).
+    %% v1 bc_message: {bc_message, Id, Role, Content, ToolCalls, ToolCallId, Name, Ts}
+    V1Msg1 = {bc_message, <<"m1">>, user, <<"hello">>, [], undefined, undefined, 100},
+    V1Msg2 = {bc_message, <<"m2">>, assistant, <<"hi">>, [], undefined, undefined, 200},
+    V1History = term_to_binary({1, [V1Msg1, V1Msg2]}),
+    SessionId = <<"test-v1-migration">>,
+    Entry = #bc_session_stored{
+        session_id = SessionId,
+        user_id    = <<"migrator">>,
+        agent_id   = <<"default">>,
+        autonomy   = supervised,
+        history    = V1History,
+        created_at = erlang:system_time(second),
+        updated_at = erlang:system_time(second),
+        config     = #{}
+    },
+    ok = mnesia:dirty_write(bc_session_stored, Entry),
+    {ok, Stored} = bc_session_store:load(SessionId),
+    [M1, M2] = Stored#bc_session_stored.history,
+    %% After migration, records should be 9-element tuples with attachments = []
+    ?assertEqual(9, tuple_size(M1)),
+    ?assertEqual(9, tuple_size(M2)),
+    ?assertEqual([], M1#bc_message.attachments),
+    ?assertEqual([], M2#bc_message.attachments),
+    ?assertEqual(<<"m1">>, M1#bc_message.id),
+    ?assertEqual(user, M1#bc_message.role).
+
+history_v2_roundtrip_with_attachments() ->
+    SessionId = <<"test-v2-attachments">>,
+    B64 = base64:encode(<<"fake image data">>),
+    History = [
+        #bc_message{id = <<"m1">>, role = user, content = <<"look at this">>,
+                    ts = 1000, attachments = [{<<"image/jpeg">>, B64}]},
+        #bc_message{id = <<"m2">>, role = assistant, content = <<"I see a photo">>,
+                    ts = 2000}
+    ],
+    ok = bc_session_store:save(SessionId, #{history => History, config => #{}}),
+    {ok, Stored} = bc_session_store:load(SessionId),
+    [R1, R2] = Stored#bc_session_stored.history,
+    ?assertEqual([{<<"image/jpeg">>, B64}], R1#bc_message.attachments),
+    ?assertEqual([], R2#bc_message.attachments).

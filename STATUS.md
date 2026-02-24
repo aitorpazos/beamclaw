@@ -9,7 +9,8 @@ sharing (M19), Telegram pairing access control (M20), and typing indicators
 (Post-M20) are complete. Cross-channel session fix applied. Workspace memory
 bootstrap file routing and pre-compaction memory flush (Post-M20) added.
 Memory search with BM25 + vector hybrid (M21–M23) is complete.
-283 EUnit tests pass.
+Telegram photo/vision support (M24) is complete.
+308 EUnit tests pass.
 
 ---
 
@@ -466,6 +467,20 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | Docs update | ✅ | CLAUDE.md, architecture.md, configuration.md, running.md |
 | EUnit tests | ✅ | 4 (search_all + keyword mode) |
 
+### M24 — Telegram Photo/Vision Support ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_types.hrl` update | ✅ | `attachments` field added to `#bc_message{}` and `#bc_channel_message{}` |
+| `bc_telegram_photo` | ✅ | Pure-function module: extract, download, validate, base64 encode |
+| `bc_channel_telegram` update | ✅ | Photo detection, download via `bc_telegram_photo`, threading attachments |
+| `bc_loop` update | ✅ | Thread attachments from `bc_channel_message` to `bc_message` |
+| `bc_provider_openrouter` update | ✅ | Multimodal `message_to_map/1`: content array with text + image_url parts |
+| `bc_session_store` update | ✅ | v2 serialization; v1→v2 migration appends `attachments = []` |
+| Config updates | ✅ | `photo` map in telegram channel config (enabled, max_size_bytes) |
+| EUnit tests | ✅ | 25 new: 16 (photo), 7 (vision provider), 2 (session store migration) |
+| Docs update | ✅ | CLAUDE.md, STATUS.md, configuration.md |
+
 ---
 
 ## Known Issues / Blockers
@@ -476,4 +491,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-24 (Memory Search BM25 + Vector Hybrid — M21–M23)
+2026-02-24 (Telegram Photo/Vision Support — M24)

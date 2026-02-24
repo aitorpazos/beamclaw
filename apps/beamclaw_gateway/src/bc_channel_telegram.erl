@@ -168,19 +168,19 @@ dispatch_telegram_message(Update) ->
     TgUserId = integer_to_binary(maps:get(<<"id">>, From, 0)),
     ChatId   = integer_to_binary(maps:get(<<"id">>, Chat, 0)),
     Username = maps:get(<<"username">>, From, <<>>),
+    {Content, Attachments} = extract_content_and_attachments(Msg, Text),
     case bc_config:canonical_user_id() of
         Canonical when Canonical =/= undefined ->
-            %% BEAMCLAW_USER set — skip pairing, proceed as canonical user
-            do_dispatch(Canonical, TgUserId, ChatId, Text, Msg);
+            do_dispatch(Canonical, TgUserId, ChatId, Content, Msg, Attachments);
         undefined ->
             DmPolicy = get_dm_policy(),
             case DmPolicy of
                 open ->
-                    do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Text, Msg);
+                    do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Content, Msg, Attachments);
                 _ ->
                     case is_user_allowed(TgUserId) of
                         true ->
-                            do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Text, Msg);
+                            do_dispatch(<<"tg:", TgUserId/binary>>, TgUserId, ChatId, Content, Msg, Attachments);
                         false when DmPolicy =:= pairing ->
                             Meta = #{<<"username">> => Username},
                             {ok, Code, Status} = bc_pairing:request_pairing(telegram, TgUserId, Meta),
@@ -196,21 +196,22 @@ dispatch_telegram_message(Update) ->
             end
     end.
 
-do_dispatch(UserId, _TgUserId, ChatId, Text, Msg) ->
+do_dispatch(UserId, _TgUserId, ChatId, Content, Msg, Attachments) ->
     AgentId   = bc_config:get(beamclaw_core, default_agent, <<"default">>),
     SessionId = bc_session_registry:derive_session_id(UserId, AgentId, telegram),
     %% Map the derived SessionId to the Telegram ChatId for response routing.
     ets:insert(bc_telegram_chat_map, {SessionId, ChatId}),
-    logger:debug("[telegram] dispatch message: chat_id=~s session_id=~s text=~s",
-                 [ChatId, SessionId, Text]),
+    logger:debug("[telegram] dispatch message: chat_id=~s session_id=~s text=~s attachments=~B",
+                 [ChatId, SessionId, Content, length(Attachments)]),
     ChannelMsg = #bc_channel_message{
-        session_id = SessionId,
-        user_id    = UserId,
-        agent_id   = AgentId,
-        channel    = telegram,
-        content    = Text,
-        raw        = Msg,
-        ts         = erlang:system_time(millisecond)
+        session_id  = SessionId,
+        user_id     = UserId,
+        agent_id    = AgentId,
+        channel     = telegram,
+        content     = Content,
+        raw         = Msg,
+        ts          = erlang:system_time(millisecond),
+        attachments = Attachments
         %% reply_pid unset — responses routed via send_response/2
     },
     case bc_session_registry:lookup(SessionId) of
@@ -227,6 +228,59 @@ do_dispatch(UserId, _TgUserId, ChatId, Text, Msg) ->
             {ok, Pid} = bc_session_registry:lookup(SessionId),
             bc_session:dispatch_run(Pid, ChannelMsg)
     end.
+
+extract_content_and_attachments(Msg, Text) ->
+    case photo_enabled() of
+        false ->
+            {Text, []};
+        true ->
+            case bc_telegram_photo:extract_photo(Msg) of
+                {ok, FileId} ->
+                    Caption = bc_telegram_photo:extract_caption(Msg),
+                    Content = case {Caption, Text} of
+                        {undefined, <<>>} -> <<"[Photo]">>;
+                        {undefined, _}    -> Text;
+                        {Cap, _}          -> Cap
+                    end,
+                    Attachments = try_download_photo(FileId),
+                    {Content, Attachments};
+                no_photo ->
+                    {Text, []}
+            end
+    end.
+
+try_download_photo(FileId) ->
+    Token = resolve_token(),
+    case bc_telegram_photo:download(FileId, Token) of
+        {ok, Mime, ImageBin} ->
+            MaxSize = photo_max_size(),
+            case bc_telegram_photo:validate_size(ImageBin, MaxSize) of
+                ok ->
+                    logger:debug("[telegram] photo downloaded: file_id=~s size=~B",
+                                 [FileId, byte_size(ImageBin)]),
+                    [bc_telegram_photo:to_attachment(Mime, ImageBin)];
+                {error, too_large} ->
+                    logger:warning("[telegram] photo too large: file_id=~s size=~B max=~B",
+                                   [FileId, byte_size(ImageBin), photo_max_size()]),
+                    []
+            end;
+        {error, Reason} ->
+            logger:warning("[telegram] photo download failed: file_id=~s reason=~p",
+                           [FileId, Reason]),
+            []
+    end.
+
+photo_enabled() ->
+    Channels = bc_config:get(beamclaw_gateway, channels, []),
+    TgConfig = proplists:get_value(telegram, Channels, #{}),
+    PhotoCfg = maps:get(photo, TgConfig, #{}),
+    maps:get(enabled, PhotoCfg, true).
+
+photo_max_size() ->
+    Channels = bc_config:get(beamclaw_gateway, channels, []),
+    TgConfig = proplists:get_value(telegram, Channels, #{}),
+    PhotoCfg = maps:get(photo, TgConfig, #{}),
+    maps:get(max_size_bytes, PhotoCfg, 5242880).  %% 5 MB default
 
 get_dm_policy() ->
     Channels = bc_config:get(beamclaw_gateway, channels, []),
