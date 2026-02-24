@@ -21,7 +21,35 @@ compaction.
 
 ## Quick Start — Docker (recommended)
 
-Requires: Docker
+Requires: Docker with Compose
+
+1. Copy the example env file and fill in your keys:
+
+```bash
+cp .env.example .env
+# Edit .env with your API keys
+```
+
+2. Start BeamClaw:
+
+```bash
+docker compose up -d --build
+```
+
+3. Verify health:
+
+```bash
+wget -qO- http://localhost:18800/health
+```
+
+After code changes, rebuild and restart with the same command:
+
+```bash
+docker compose up -d --build
+```
+
+<details>
+<summary>Alternative: docker run (no Compose)</summary>
 
 ```bash
 docker run -d \
@@ -33,11 +61,7 @@ docker run -d \
   ghcr.io/beamclaw/beamclaw:latest
 ```
 
-Verify the node is healthy:
-
-```bash
-wget -qO- http://localhost:18800/health
-```
+</details>
 
 See [docs/running.md](docs/running.md) for full Docker usage, channel selection, and MCP
 server configuration.

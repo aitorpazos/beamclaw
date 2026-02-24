@@ -415,6 +415,16 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | EUnit tests | ✅ | 17 tests: passthrough, all tag types, code preservation, strict mode, edge cases |
 | CLAUDE.md update | ✅ | `bc_thinking.erl` added to File Layout |
 
+### Post-M20 — Docker Compose ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `docker-compose.yml` | ✅ | Single-service compose file; env_file, named volume, healthcheck |
+| `.env.example` | ✅ | Template with required/optional env vars (committed) |
+| `.env` placeholder | ✅ | Working env file with placeholders (gitignored) |
+| `README.md` update | ✅ | Docker quick-start uses compose as primary method |
+| `docs/running.md` update | ✅ | Docker Compose subsection under Mode 3 |
+
 ---
 
 ## Known Issues / Blockers
@@ -425,4 +435,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-24 (Strip LLM thinking/reasoning tags — Post-M20)
+2026-02-24 (Docker Compose — Post-M20)

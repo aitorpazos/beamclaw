@@ -1,0 +1,20 @@
+services:
+  beamclaw:
+    build: .
+    container_name: beamclaw
+    restart: unless-stopped
+    ports:
+      - "${BEAMCLAW_PORT:-18800}:18800"
+    volumes:
+      - beamclaw_data:/home/beamclaw/.beamclaw
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:18800/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  beamclaw_data:

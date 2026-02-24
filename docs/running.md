@@ -368,6 +368,41 @@ starting.
 
 Best for: production deployment, zero Erlang installation required.
 
+### Docker Compose (recommended)
+
+Copy the example environment file and add your secrets:
+
+```bash
+cp .env.example .env
+# Edit .env — at minimum set OPENROUTER_API_KEY
+```
+
+Start (or rebuild after code changes):
+
+```bash
+docker compose up -d --build
+```
+
+Stop:
+
+```bash
+docker compose down
+```
+
+Stop and remove data volume:
+
+```bash
+docker compose down -v
+```
+
+View logs:
+
+```bash
+docker compose logs -f
+```
+
+### docker run (alternative)
+
 ```bash
 docker run -d \
   --name beamclaw \
