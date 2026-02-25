@@ -63,7 +63,13 @@ callback_mode() -> [state_functions, state_enter].
 
 init(Config) ->
     SessionId   = maps:get(session_id,   Config),
-    ProviderMod = maps:get(provider_mod, Config, bc_provider_openrouter),
+    DefaultProv = case bc_config:get(beamclaw_core, default_provider, openrouter) of
+        openai     -> bc_provider_openai;
+        anthropic  -> bc_provider_anthropic;
+        openrouter -> bc_provider_openrouter;
+        _          -> bc_provider_openrouter
+    end,
+    ProviderMod = maps:get(provider_mod, Config, DefaultProv),
     %% bc_session registers in bc_session_registry synchronously (call, not cast)
     %% during its own init/1. The supervisor starts bc_session before bc_loop,
     %% so this lookup always succeeds.
@@ -460,6 +466,7 @@ get_provider_config(ProviderMod) ->
     ProviderKey = case ProviderMod of
         bc_provider_openrouter -> openrouter;
         bc_provider_openai     -> openai;
+        bc_provider_anthropic  -> anthropic;
         _                      -> openrouter
     end,
     Providers = application:get_env(beamclaw_core, providers, []),

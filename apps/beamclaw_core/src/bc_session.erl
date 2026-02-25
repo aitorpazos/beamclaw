@@ -125,7 +125,7 @@ init(Config) ->
         loop_pid     = undefined,
         loop_busy    = false,
         channel_mod  = maps:get(channel_mod,  Config, undefined),
-        provider_mod = maps:get(provider_mod, Config, bc_provider_openrouter),
+        provider_mod = maps:get(provider_mod, Config, default_provider_mod()),
         memory_mod   = maps:get(memory_mod,   Config, bc_memory_ets),
         history      = RestoredHistory,
         pending_runs = queue:new(),
@@ -236,6 +236,14 @@ maybe_load_history(SessionId) ->
             end;
         false ->
             []
+    end.
+
+default_provider_mod() ->
+    case bc_config:get(beamclaw_core, default_provider, openrouter) of
+        openai     -> bc_provider_openai;
+        anthropic  -> bc_provider_anthropic;
+        openrouter -> bc_provider_openrouter;
+        _          -> bc_provider_openrouter
     end.
 
 generate_id() ->

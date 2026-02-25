@@ -81,7 +81,8 @@ summarize(Messages) ->
         content = ConvText,
         ts      = erlang:system_time(millisecond)
     },
-    ProvMod    = bc_config:get(beamclaw_core, default_provider, openrouter),
+    ProvAtom   = bc_config:get(beamclaw_core, default_provider, openrouter),
+    ProvMod    = provider_atom_to_mod(ProvAtom),
     ProvConfig = get_provider_config(ProvMod),
     case ProvMod:init(ProvConfig) of
         {ok, ProvState} ->
@@ -101,10 +102,16 @@ messages_to_text(Messages) ->
     end, Messages),
     iolist_to_binary(Parts).
 
+provider_atom_to_mod(openai)     -> bc_provider_openai;
+provider_atom_to_mod(anthropic)  -> bc_provider_anthropic;
+provider_atom_to_mod(openrouter) -> bc_provider_openrouter;
+provider_atom_to_mod(_)          -> bc_provider_openrouter.
+
 get_provider_config(ProvMod) ->
     ProviderKey = case ProvMod of
         bc_provider_openrouter -> openrouter;
         bc_provider_openai     -> openai;
+        bc_provider_anthropic  -> anthropic;
         _                      -> openrouter
     end,
     Providers = bc_config:get(beamclaw_core, providers, []),

@@ -50,6 +50,8 @@ parse(_) ->
 
 %% ---- Native ----
 
+native_to_record(#bc_tool_call{} = TC) ->
+    TC;
 native_to_record(#{<<"id">> := Id, <<"function">> := #{<<"name">> := Name,
                                                         <<"arguments">> := ArgsJson}}) ->
     Args = decode_args(ArgsJson),
