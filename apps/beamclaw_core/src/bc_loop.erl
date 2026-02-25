@@ -296,21 +296,24 @@ receive_stream(Data, T0, TickRef) ->
             Duration = erlang:monotonic_time(millisecond) - T0,
             bc_obs:emit(llm_response, #{session_id  => Data#loop_data.session_id,
                                         duration_ms => Duration, success => true}),
-            ScrubbedMsg = bc_scrubber:scrub_message(FullMsg),
-            bc_session:append_message(Data#loop_data.session_pid, ScrubbedMsg),
-            try route_response(Data, ScrubbedMsg)
+            logger:debug("[loop] stream_done received, processing response"),
+            try
+                ScrubbedMsg = bc_scrubber:scrub_message(FullMsg),
+                logger:debug("[loop] scrubbed, content=~p tool_calls=~p",
+                             [byte_size(ScrubbedMsg#bc_message.content),
+                              length(ScrubbedMsg#bc_message.tool_calls)]),
+                bc_session:append_message(Data#loop_data.session_pid, ScrubbedMsg),
+                route_response(Data, ScrubbedMsg),
+                ToolCalls = bc_tool_parser:parse(ScrubbedMsg),
+                logger:debug("[loop] parsed ~p tool calls", [length(ToolCalls)]),
+                NewData = Data#loop_data{tool_calls = ToolCalls},
+                case ToolCalls of
+                    [] -> {next_state, finalizing, NewData};
+                    _  -> maybe_await_approval(NewData)
+                end
             catch E:R:St ->
-                logger:error("[loop] route_response crashed: ~p:~p ~p", [E, R, St])
-            end,
-            ToolCalls = try bc_tool_parser:parse(ScrubbedMsg)
-            catch E2:R2:St2 ->
-                logger:error("[loop] tool_parser crashed: ~p:~p ~p", [E2, R2, St2]),
-                []
-            end,
-            NewData = Data#loop_data{tool_calls = ToolCalls},
-            case ToolCalls of
-                [] -> {next_state, finalizing, NewData};
-                _  -> maybe_await_approval(NewData)
+                logger:error("[loop] post-stream processing crashed: ~p:~p ~p", [E, R, St]),
+                {next_state, finalizing, Data}
             end;
         {stream_error, _Pid, Reason} ->
             cancel_typing_tick(TickRef),
