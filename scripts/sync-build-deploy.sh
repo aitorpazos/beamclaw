@@ -71,18 +71,20 @@ log "Tests passed."
 
 # 6. Deploy (restart launchd service)
 log "Deploying — stopping beamclaw..."
-# Kill the BEAM process directly for clean shutdown
-BEAM_PID=$(ps aux | grep "beamclaw.*-sname" | grep -v grep | awk '{print $2}' || true)
-if [ -n "$BEAM_PID" ]; then
-    kill "$BEAM_PID" 2>/dev/null || true
-    sleep 3
-    # Force kill if still alive
-    kill -9 "$BEAM_PID" 2>/dev/null || true
-    sleep 1
-fi
-# Kill any remaining daemon wrapper
-ps aux | grep "beamclaw.*daemon" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true
+# Kill ALL beamclaw processes (BEAM, daemon wrapper, erl_call, inet_gethost)
+pkill -f "beamclaw" 2>/dev/null || true
+sleep 3
+# Force kill any survivors
+pkill -9 -f "beamclaw" 2>/dev/null || true
 sleep 2
+# Wait for port 18800 to be released (up to 10s)
+for i in $(seq 1 10); do
+    if ! curl -s -m 1 http://localhost:18800/health >/dev/null 2>&1; then
+        break
+    fi
+    log "Port 18800 still in use, waiting... ($i/10)"
+    sleep 1
+done
 
 log "Starting beamclaw via launchd..."
 launchctl kickstart "gui/$(id -u)/com.beamclaw" 2>&1 | tee -a "$LOG"
