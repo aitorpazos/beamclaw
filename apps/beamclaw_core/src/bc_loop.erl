@@ -402,9 +402,10 @@ execute_tool_calls(Data) ->
     {next_state, streaming, NewData}.
 
 run_tool(#bc_tool_call{name = Name, args = Args}, SessionRef) ->
+    Context = #{tool_bridge_fn => make_tool_bridge_fn(SessionRef)},
     case bc_tool_registry:lookup(Name) of
         {ok, {Mod, _Def}} ->
-            Mod:execute(Args, SessionRef, #{});
+            Mod:execute(Args, SessionRef, Context);
         {error, not_found} ->
             case bc_mcp_registry:lookup(Name) of
                 {ok, {ServerPid, _}} ->
@@ -412,6 +413,23 @@ run_tool(#bc_tool_call{name = Name, args = Args}, SessionRef) ->
                 {error, not_found} ->
                     {error, <<"tool not found">>}
             end
+    end.
+
+%% Build a tool bridge callback for sandbox use. Captures access to both
+%% bc_tool_registry and bc_mcp_registry without creating dependency cycles.
+make_tool_bridge_fn(SessionRef) ->
+    fun(ToolName, ToolArgs) ->
+        case bc_tool_registry:lookup(ToolName) of
+            {ok, {Mod, _Def}} ->
+                Mod:execute(ToolArgs, SessionRef, #{});
+            {error, not_found} ->
+                case bc_mcp_registry:lookup(ToolName) of
+                    {ok, {ServerPid, _}} ->
+                        bc_mcp_server:call_tool(ServerPid, ToolName, ToolArgs);
+                    {error, not_found} ->
+                        {error, <<"Tool not found: ", ToolName/binary>>}
+                end
+        end
     end.
 
 result_to_message(#bc_tool_result{tool_call_id = Id, name = Name,

@@ -34,8 +34,9 @@ Or install via a package manager that provides rebar3 ≥ 3.23.
 rebar3 compile
 ```
 
-All seven OTP apps (`beamclaw_obs`, `beamclaw_memory`, `beamclaw_tools`, `beamclaw_mcp`,
-`beamclaw_core`, `beamclaw_gateway`, `beamclaw_cli`) must compile with zero warnings.
+All eight OTP apps (`beamclaw_obs`, `beamclaw_memory`, `beamclaw_tools`, `beamclaw_sandbox`,
+`beamclaw_mcp`, `beamclaw_core`, `beamclaw_gateway`, `beamclaw_cli`) must compile with zero
+warnings.
 
 ---
 
@@ -51,7 +52,7 @@ Produces a self-contained binary at:
 _build/default/bin/beamclaw
 ```
 
-The binary embeds all seven app `.beam` files plus deps in a single zip-based escript.
+The binary embeds all eight app `.beam` files plus deps in a single zip-based escript.
 It requires a compatible OTP installation on the target machine (same major version).
 
 ```bash
@@ -73,7 +74,7 @@ rebar3 eunit                        # all apps
 rebar3 eunit --module=bc_scrubber   # single module
 ```
 
-Expected: 47+ tests passing, 0 failures.
+Expected: 407+ tests passing, 0 failures.
 
 ---
 
@@ -152,6 +153,35 @@ Build-time secrets are **never** needed; the image contains no API keys. Secrets
 injected at `docker run` time via `-e` flags.
 
 Expected image size: < 100 MB.
+
+---
+
+## Building the Sandbox Docker Image
+
+The sandbox system uses a separate Docker image for isolated code execution.
+This image is **not** the same as the main BeamClaw release image.
+
+```bash
+# Via the CLI (recommended)
+beamclaw sandbox build
+
+# Or directly with Docker
+docker build -t beamclaw-sandbox:latest \
+  -f apps/beamclaw_sandbox/priv/docker/Dockerfile.sandbox \
+  apps/beamclaw_sandbox/priv/docker/
+```
+
+The sandbox image is based on `python:3.12-alpine` and includes:
+- The `beamclaw_bridge` Python module for tool discovery and invocation
+- A non-root user (`sandbox`) for process isolation
+- `ENTRYPOINT ["sleep", "infinity"]` — scripts are run via `docker exec`
+
+The sandbox image must be built before enabling sandbox features in `sys.config`.
+Verify with:
+
+```bash
+beamclaw sandbox status
+```
 
 ---
 

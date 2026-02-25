@@ -20,6 +20,10 @@ Commands:
   agent show NAME      Show agent bootstrap files
   agent delete NAME    Delete an agent workspace
   agent rehatch NAME   Factory reset: restore all files to defaults
+  sandbox status       Docker availability, image status, sandbox config
+  sandbox list         Active sandbox containers
+  sandbox kill ID      Force-kill a sandbox container
+  sandbox build        Build sandbox Docker image
   pair [list]          List pending and approved pairing requests
   pair <channel> CODE  Approve a pending pairing request
   pair revoke CH ID    Revoke a user from a channel's allowlist
@@ -280,6 +284,63 @@ as context. This is off by default to keep token usage predictable:
 
 See `docs/configuration.md` for full search tuning parameters (weights, chunk sizes,
 minimum scores).
+
+### Sandbox Management
+
+The sandbox system provides Docker-based code execution with MCP tool bridging.
+It is opt-in and requires Docker.
+
+#### Setup
+
+1. Enable sandbox in `sys.config`: `{enabled, true}`
+2. Build the sandbox Docker image:
+
+```bash
+beamclaw sandbox build
+```
+
+3. Verify setup:
+
+```bash
+beamclaw sandbox status
+```
+
+#### CLI commands
+
+```bash
+beamclaw sandbox status      # Docker availability, image status, config
+beamclaw sandbox list        # Active sandbox containers
+beamclaw sandbox kill ID     # Force-kill a sandbox container
+beamclaw sandbox build       # Build sandbox Docker image from priv/docker/
+```
+
+#### How it works
+
+When enabled, the `exec` tool becomes available to the agent. The agent writes
+a Python or Bash script, which runs inside a Docker container with:
+
+- No network access (`--network none`)
+- No capabilities (`--cap-drop ALL`)
+- Read-only filesystem (`--read-only`)
+- Memory and CPU limits
+- PII tokenization at all boundary crossings
+- Tool access policy enforcement
+
+The container can discover and call BeamClaw tools (built-in + MCP) via a
+Python bridge module (`beamclaw_bridge`):
+
+```python
+from beamclaw_bridge import search_tools, call_tool
+
+# Discover available tools
+tools = search_tools("names")
+
+# Call a tool
+result = call_tool("read_file", path="/workspace/data.json")
+```
+
+See `docs/configuration.md` for sandbox configuration options and
+`docs/architecture.md` for the full architecture description.
 
 ### Telegram Pairing (Access Control)
 

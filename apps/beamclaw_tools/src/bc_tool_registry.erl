@@ -23,7 +23,8 @@ MCP-discovered tools are also registered here (source = mcp).
 """.
 -behaviour(gen_server).
 
--export([start_link/0, register/2, lookup/1, list/0]).
+-export([start_link/0, register/2, lookup/1, list/0,
+         list_names/0, get_definition/1]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
@@ -50,9 +51,22 @@ lookup(Name) ->
 list() ->
     ets:tab2list(?TAB).
 
+-doc "List just the registered tool names.".
+-spec list_names() -> [binary()].
+list_names() ->
+    [Name || {Name, _Mod, _Def} <- ets:tab2list(?TAB)].
+
+-doc "Get the definition for a specific tool by name.".
+-spec get_definition(Name :: binary()) -> {ok, map()} | {error, not_found}.
+get_definition(Name) ->
+    case ets:lookup(?TAB, Name) of
+        [{Name, _Mod, Def}] -> {ok, Def};
+        []                  -> {error, not_found}
+    end.
+
 init([]) ->
     Tab = ets:new(?TAB, [set, named_table, public, {read_concurrency, true}]),
-    %% Register built-in tools
+    %% Register built-in tools (sandbox tools register themselves on app start)
     BuiltIns = [bc_tool_terminal, bc_tool_bash, bc_tool_curl, bc_tool_jq,
                 bc_tool_read_file, bc_tool_write_file, bc_tool_workspace_memory],
     lists:foreach(fun(Mod) ->

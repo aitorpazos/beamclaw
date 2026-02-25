@@ -1,11 +1,11 @@
 # BeamClaw Architecture
 
-BeamClaw is an Erlang/OTP 28 umbrella project composed of seven OTP applications. Each app
+BeamClaw is an Erlang/OTP 28 umbrella project composed of eight OTP applications. Each app
 has a clearly defined responsibility and a strictly acyclic dependency relationship.
 
 ---
 
-## Seven-App Umbrella
+## Eight-App Umbrella
 
 ```
 beamclaw_obs         — fire-and-forget telemetry (zero sibling deps)
@@ -14,13 +14,15 @@ beamclaw_memory      — memory behaviour + ETS / Mnesia backends
      ↑
 beamclaw_tools       — built-in tools + tool registry
      ↑
+beamclaw_sandbox     — Docker sandboxed code execution, PII tokenization, tool bridge
+     ↑
 beamclaw_mcp         — MCP client (stdio / HTTP), tool discovery
      ↑
 beamclaw_core        — sessions, agentic loop, LLM providers, approval, compaction
      ↑
 beamclaw_gateway     — channels (Telegram, TUI), HTTP gateway, rate limiter
 
-beamclaw_cli         — CLI escript (not a daemon app; bundles all six above)
+beamclaw_cli         — CLI escript (not a daemon app; bundles all above)
 ```
 
 The rule: no dependency cycle. `beamclaw_obs` never imports from any sibling.
@@ -31,6 +33,7 @@ The rule: no dependency cycle. `beamclaw_obs` never imports from any sibling.
 | `beamclaw_obs` | Observability fan-out | `bc_obs`, `bc_obs_manager`, `bc_obs_log` |
 | `beamclaw_memory` | Session memory + search | `bc_memory`, `bc_memory_ets`, `bc_memory_mnesia`, `bc_bm25`, `bc_vector`, `bc_chunker`, `bc_hybrid`, `bc_embedding`, `bc_embedding_cache` |
 | `beamclaw_tools` | Tool execution | `bc_tool`, `bc_tool_registry`, built-in tools |
+| `beamclaw_sandbox` | Sandboxed execution | `bc_sandbox`, `bc_sandbox_registry`, `bc_tool_exec`, `bc_pii_tokenizer`, `bc_sandbox_policy`, `bc_sandbox_env`, `bc_sandbox_bridge`, `bc_sandbox_docker`, `bc_sandbox_discovery`, `bc_sandbox_skills` |
 | `beamclaw_mcp` | MCP protocol | `bc_mcp_server`, `bc_mcp_registry` |
 | `beamclaw_core` | Brain | `bc_session`, `bc_loop`, `bc_provider_*`, `bc_approval`, `bc_scrubber`, `bc_skill_parser`, `bc_skill_discovery`, `bc_skill_eligibility`, `bc_skill_installer` |
 | `beamclaw_gateway` | Interfaces | `bc_channel_telegram`, `bc_channel_tui`, Cowboy handlers |
@@ -65,6 +68,23 @@ beamclaw_memory_sup  (one_for_one)
 redundant API calls. The remaining memory modules (`bc_bm25`, `bc_vector`, `bc_chunker`,
 `bc_hybrid`, `bc_embedding`) are pure-function or stateless — they have no supervised
 processes.
+
+### beamclaw_sandbox
+
+```
+beamclaw_sandbox_sup  (one_for_one)
+  ├── bc_sandbox_registry     (gen_server, permanent — ETS: {session_id, scope} → pid)
+  └── bc_sandbox_sup          (simple_one_for_one)
+        └── [per sandbox] bc_sandbox (gen_server, transient — Docker container lifecycle)
+```
+
+Each `bc_sandbox` manages a Docker container with hardened security flags (`--cap-drop ALL`,
+`--read-only`, `--security-opt no-new-privileges`, `--network none`, memory/CPU/PID limits).
+A Unix domain socket mounted into the container enables a Python bridge to call back to
+BeamClaw tools via JSON-RPC 2.0.
+
+The sandbox app is opt-in (`{enabled, false}` by default) and requires Docker on the host.
+When enabled, `beamclaw_sandbox_app` registers `bc_tool_exec` in `bc_tool_registry`.
 
 ### beamclaw_mcp
 
@@ -265,7 +285,8 @@ Implementations: `bc_provider_openrouter`, `bc_provider_openai`.
 ```
 
 Built-in implementations: `bc_tool_bash`, `bc_tool_terminal`, `bc_tool_curl`,
-`bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory`.
+`bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory`,
+`bc_tool_exec` (sandboxed code execution — in `beamclaw_sandbox`, registered conditionally).
 
 ### `bc_channel` — Messaging channel abstraction
 
@@ -428,3 +449,68 @@ request body as OpenAI-format function-calling tool definitions.
 
 Rate limiting: sliding-window per client IP, ETS-backed, pruned every 60 s. Checked in
 every handler before dispatch.
+
+---
+
+## Sandbox Execution
+
+The `beamclaw_sandbox` app implements the "Code Execution with MCP" pattern: instead of
+the LLM making N separate tool calls (each a round-trip through the context window), the
+agent writes a **script** that runs in a Docker sandbox, discovers tools via a filesystem,
+calls them locally via a bridge, and returns only the filtered/aggregated result.
+
+### Container architecture
+
+```
+┌─────────────────────────────────────────────┐
+│  BeamClaw (Erlang VM)                       │
+│                                             │
+│  bc_sandbox ─── Unix socket ───┐            │
+│  bc_sandbox_bridge             │            │
+│  bc_pii_tokenizer              │            │
+│  bc_sandbox_policy             │            │
+│  bc_sandbox_discovery          │            │
+│                                │            │
+└────────────────────────────────┼────────────┘
+                                 │
+┌────────────────────────────────┼────────────┐
+│  Docker container              │            │
+│  (--network none, --read-only) │            │
+│                                │            │
+│  /tools/                       │            │
+│    index.txt                   │            │
+│    <tool>/description.txt      │            │
+│    <tool>/schema.json          │            │
+│                                │            │
+│  beamclaw_bridge.py ─── Unix socket         │
+│    search_tools()                           │
+│    get_tool(name)                           │
+│    call_tool(name, **args)                  │
+│                                             │
+│  agent_script.py  ← written via docker cp   │
+└─────────────────────────────────────────────┘
+```
+
+### Security layers
+
+1. **Docker isolation**: `--cap-drop ALL`, `--read-only`, `--security-opt no-new-privileges`,
+   `--tmpfs /tmp`, `--memory 512m`, `--cpus 1.0`, `--pids-limit 256`, `--network none`
+2. **PII tokenization** (`bc_pii_tokenizer`): bidirectional masking at all boundary crossings
+3. **Tool policy** (`bc_sandbox_policy`): allow/deny rules with wildcard support
+4. **Environment hardening** (`bc_sandbox_env`): allowlist/blocklist filtering; API keys
+   never exposed to containers
+5. **Credential scrubbing** (`bc_scrubber`): standard scrubbing on final output
+
+### Tool bridge
+
+`bc_loop` injects a `tool_bridge_fn` closure into the Context map passed to
+`bc_tool_exec:execute/3`. This callback captures access to both `bc_tool_registry` and
+`bc_mcp_registry`, avoiding a dependency cycle between `beamclaw_sandbox` and `beamclaw_core`.
+When the bridge receives a `call_tool` request from the container, it dispatches through
+the callback to execute the tool server-side and returns the result via the Unix socket.
+
+### Skills persistence
+
+Successful sandbox scripts can be saved as SKILL.md files (`bc_sandbox_skills`) with
+`type: sandbox_script` metadata. These integrate with the existing skill system (M16–M17)
+and can be reloaded by name in future `exec` tool calls.

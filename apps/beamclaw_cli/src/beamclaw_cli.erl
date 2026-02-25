@@ -40,6 +40,8 @@ Output:     _build/default/bin/beamclaw
                              cmd_skills_show/1, cmd_skills_install/1,
                              cmd_pair_list/0, cmd_pair_approve/2,
                              cmd_pair_revoke/2,
+                             cmd_sandbox_status/0, cmd_sandbox_list/0,
+                             cmd_sandbox_kill/1, cmd_sandbox_build/0,
                              spawn_daemon/0, check_openrouter_network/0]}).
 
 -include_lib("beamclaw_core/include/bc_types.hrl").
@@ -74,6 +76,11 @@ main(["pair", "list"            | _])     -> cmd_pair_list();
 main(["pair", "revoke", Ch, Id  | _])     -> cmd_pair_revoke(list_to_atom(Ch), list_to_binary(Id));
 main(["pair", Ch, Code          | _])     -> cmd_pair_approve(list_to_atom(Ch), list_to_binary(Code));
 main(["pair"                    | _])     -> cmd_pair_list();
+main(["sandbox", "status"       | _])     -> cmd_sandbox_status();
+main(["sandbox", "list"         | _])     -> cmd_sandbox_list();
+main(["sandbox", "kill", Id     | _])     -> cmd_sandbox_kill(list_to_binary(Id));
+main(["sandbox", "build"        | _])     -> cmd_sandbox_build();
+main(["sandbox"                 | _])     -> cmd_sandbox_status();
 main(["doctor"                  | _])     -> cmd_doctor();
 main(["status"                  | _])     -> cmd_status();
 main(["version"                 | _])     -> cmd_version();
@@ -616,6 +623,76 @@ cmd_pair_revoke(Channel, UserId) ->
             halt(1)
     end.
 
+-doc "Show sandbox configuration and Docker availability.".
+cmd_sandbox_status() ->
+    Enabled = application:get_env(beamclaw_sandbox, enabled, false),
+    Image = application:get_env(beamclaw_sandbox, docker_image,
+                                "beamclaw-sandbox:latest"),
+    io:format("Sandbox status:~n"),
+    io:format("  Enabled:  ~p~n", [Enabled]),
+    io:format("  Image:    ~s~n", [Image]),
+    DockerCheck = os:cmd("docker version --format '{{.Server.Version}}' 2>&1"),
+    case string:trim(DockerCheck) of
+        "" ->
+            io:format("  Docker:   not found~n");
+        Version ->
+            io:format("  Docker:   ~s~n", [Version])
+    end,
+    ImageCheck = os:cmd("docker image inspect --format '{{.Id}}' " ++ Image ++ " 2>&1"),
+    case string:find(ImageCheck, "sha256:") of
+        nomatch ->
+            io:format("  Image OK: no (run: beamclaw sandbox build)~n");
+        _ ->
+            io:format("  Image OK: yes~n")
+    end,
+    halt(0).
+
+-doc "List active sandbox containers.".
+cmd_sandbox_list() ->
+    Output = os:cmd("docker ps --filter 'name=beamclaw-sbx-' "
+                    "--format '{{.Names}}\t{{.Status}}\t{{.CreatedAt}}' 2>&1"),
+    case string:trim(Output) of
+        "" ->
+            io:format("No active sandboxes.~n");
+        Lines ->
+            io:format("Active sandboxes:~n"),
+            io:format("~s~n", [Lines])
+    end,
+    halt(0).
+
+-doc "Force-kill a sandbox container by name or ID.".
+cmd_sandbox_kill(Id) ->
+    Output = os:cmd("docker kill " ++ binary_to_list(Id) ++ " 2>&1"),
+    _ = os:cmd("docker rm -f " ++ binary_to_list(Id) ++ " 2>&1"),
+    io:format("~s", [Output]),
+    halt(0).
+
+-doc "Build the sandbox Docker image from priv/docker/.".
+cmd_sandbox_build() ->
+    Image = application:get_env(beamclaw_sandbox, docker_image,
+                                "beamclaw-sandbox:latest"),
+    %% Find the Dockerfile.sandbox in the sandbox app priv dir
+    DockerfilePath = case code:priv_dir(beamclaw_sandbox) of
+        {error, _} ->
+            %% Fallback: try relative path
+            "apps/beamclaw_sandbox/priv/docker/Dockerfile.sandbox";
+        PrivDir ->
+            filename:join([PrivDir, "docker", "Dockerfile.sandbox"])
+    end,
+    case filelib:is_file(DockerfilePath) of
+        false ->
+            io:format(standard_error,
+                      "beamclaw: Dockerfile not found at ~s~n", [DockerfilePath]),
+            halt(1);
+        true ->
+            Args = bc_sandbox_docker:build_args(DockerfilePath, Image),
+            Cmd = string:join(["docker" | Args], " ") ++ " 2>&1",
+            io:format("Building ~s...~n", [Image]),
+            Output = os:cmd(Cmd),
+            io:format("~s~n", [Output]),
+            halt(0)
+    end.
+
 cmd_help() ->
     io:format(
         "Usage: beamclaw <command>~n~n"
@@ -638,6 +715,10 @@ cmd_help() ->
         "  pair [list]          List pending and approved pairing requests~n"
         "  pair <channel> CODE  Approve a pending pairing request~n"
         "  pair revoke CH ID    Revoke a user from a channel's allowlist~n"
+        "  sandbox [status]     Show sandbox config and Docker availability~n"
+        "  sandbox list         List active sandbox containers~n"
+        "  sandbox kill ID      Force-kill a sandbox container~n"
+        "  sandbox build        Build the sandbox Docker image~n"
         "  doctor               Check environment and connectivity~n"
         "  status               Ping running gateway HTTP health endpoint~n"
         "  version              Print version~n"

@@ -90,7 +90,7 @@ Before merging any PR, verify:
 
 - **Language/Runtime**: Erlang/OTP 28
 - **Build Tool**: rebar3
-- **Project Structure**: Umbrella project — seven OTP apps under `apps/`
+- **Project Structure**: Umbrella project — eight OTP apps under `apps/`
 - **HTTP server**: Cowboy 2.x
 - **HTTP client**: Hackney
 - **JSON**: jsx
@@ -123,6 +123,12 @@ beamclaw skills status       # detailed requirements check
 beamclaw skills show NAME    # show skill content
 beamclaw skills install NAME # install skill dependencies
 
+# Sandbox management (via CLI escript)
+beamclaw sandbox status      # Docker availability, image status, config
+beamclaw sandbox list        # active sandbox containers
+beamclaw sandbox kill ID     # force-kill a sandbox container
+beamclaw sandbox build       # build sandbox Docker image
+
 # Pairing / access control (via CLI escript)
 beamclaw pair                       # list pending + approved
 beamclaw pair list                  # same as above
@@ -134,11 +140,12 @@ beamclaw pair revoke telegram <ID>  # revoke user from allowlist
 
 ## Application Dependency Graph
 
-Seven OTP apps under `apps/`. Dependency direction (arrow = "depends on"):
+Eight OTP apps under `apps/`. Dependency direction (arrow = "depends on"):
 
 ```
-beamclaw_gateway → beamclaw_core → beamclaw_mcp   → beamclaw_tools → beamclaw_obs
-                                 → beamclaw_memory → beamclaw_obs
+beamclaw_gateway → beamclaw_core → beamclaw_sandbox → beamclaw_tools → beamclaw_obs
+                                 → beamclaw_mcp      → beamclaw_tools
+                                 → beamclaw_memory   → beamclaw_obs
                                  → beamclaw_tools
                                  → beamclaw_obs
                  → beamclaw_obs
@@ -149,8 +156,9 @@ beamclaw_gateway → beamclaw_core → beamclaw_mcp   → beamclaw_tools → bea
 | `beamclaw_obs` | Fire-and-forget telemetry | none |
 | `beamclaw_memory` | Memory behaviour + backends | obs |
 | `beamclaw_tools` | Built-in tools + tool registry | obs |
+| `beamclaw_sandbox` | Docker sandboxed code execution, PII tokenization, tool policy | obs, tools |
 | `beamclaw_mcp` | MCP server connections (stdio/HTTP), tool discovery | obs, tools |
-| `beamclaw_core` | Sessions, agentic loop, LLM providers, approval, compaction | obs, memory, tools, mcp |
+| `beamclaw_core` | Sessions, agentic loop, LLM providers, approval, compaction | obs, memory, tools, mcp, sandbox |
 | `beamclaw_gateway` | Channels (Telegram, TUI), HTTP gateway, rate limiter | core, obs |
 | `beamclaw_cli` | CLI escript (`beamclaw` binary); not a daemon OTP app | all (bundled via `rebar3 escriptize`) |
 
@@ -200,6 +208,20 @@ beamclaw_gateway_sup  (one_for_one)
         ├── bc_channel_telegram_sup → bc_channel_telegram (gen_server)
         └── bc_channel_tui_sup      → bc_channel_tui      (gen_server)
 ```
+
+### `beamclaw_sandbox`
+
+```
+beamclaw_sandbox_sup  (one_for_one)
+  ├── bc_sandbox_registry     (gen_server, permanent — ETS: {session_id, scope} → pid)
+  └── bc_sandbox_sup          (simple_one_for_one)
+        └── [per sandbox] bc_sandbox (gen_server, transient — Docker container lifecycle)
+```
+
+Each `bc_sandbox` manages a Docker container with `--network none`, `--cap-drop ALL`,
+`--read-only`, and memory/CPU limits. A Unix domain socket bridge enables the container
+to call back to BeamClaw tools via JSON-RPC 2.0. The sandbox is opt-in (`{enabled, false}`
+by default) and requires Docker.
 
 ### `beamclaw_obs`
 
@@ -254,7 +276,7 @@ Implementations: `bc_provider_openrouter`, `bc_provider_openai`.
 -callback min_autonomy() -> autonomy_level().
 ```
 
-Implementations: `bc_tool_terminal`, `bc_tool_bash`, `bc_tool_curl`, `bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory` (MEMORY.md + daily logs + bootstrap files).
+Implementations: `bc_tool_terminal`, `bc_tool_bash`, `bc_tool_curl`, `bc_tool_jq`, `bc_tool_read_file`, `bc_tool_write_file`, `bc_tool_workspace_memory` (MEMORY.md + daily logs + bootstrap files), `bc_tool_exec` (sandboxed code execution — in `beamclaw_sandbox`, registered conditionally).
 
 ### `bc_channel` — Messaging channel abstraction (`beamclaw_core`)
 
@@ -531,6 +553,26 @@ as the user_id, enabling cross-channel session sharing for single-user deploymen
         {tui,      #{enabled => true}}
     ]}
 ]},
+{beamclaw_sandbox, [
+    {enabled, false},                          %% opt-in; requires Docker
+    {docker_image, "beamclaw-sandbox:latest"},
+    {scope, session},                          %% session | agent | shared
+    {timeout_seconds, 60},
+    {memory_limit, "512m"},
+    {cpu_limit, "1.0"},
+    {network, none},                           %% none | bridge | host
+    {workspace_mount, ro},                     %% none | ro | rw
+    {max_output_bytes, 1048576},               %% 1 MB
+    {bridge_socket_dir, "/tmp/beamclaw-bridges"},
+    {pii, #{enabled => true, patterns => [],
+            tokenize_scripts => true, tokenize_results => true}},
+    {policy, #{default_action => allow,
+               rules => [{allow, <<"read_file">>}, {allow, <<"curl">>},
+                          {deny, <<"bash">>}, {deny, <<"terminal">>}]}},
+    {env_allowlist, [<<"PATH">>, <<"HOME">>, <<"LANG">>, <<"TERM">>]},
+    {env_blocklist, [<<"OPENROUTER_API_KEY">>, <<"OPENAI_API_KEY">>,
+                     <<"TELEGRAM_BOT_TOKEN">>, <<"AWS_SECRET_ACCESS_KEY">>]}
+]},
 {beamclaw_obs, []},
 {beamclaw_memory, [
     {backend, ets},
@@ -644,6 +686,28 @@ beamclaw/
       bc_tool_write_file.erl
       bc_tool_workspace_memory.erl  %% agent MEMORY.md + daily logs + bootstrap files + search
       bc_workspace_path.erl         %% pure path resolution + memory dir (avoids dep cycle)
+    beamclaw_sandbox/
+      src/
+        beamclaw_sandbox.app.src
+        beamclaw_sandbox_app.erl
+        beamclaw_sandbox_sup.erl
+        bc_sandbox_registry.erl    %% ETS: {session_id, scope} → pid
+        bc_sandbox_sup.erl         %% simple_one_for_one for bc_sandbox
+        bc_sandbox.erl             %% per-sandbox Docker lifecycle gen_server
+        bc_sandbox_docker.erl      %% pure: Docker command arg building
+        bc_sandbox_bridge.erl      %% JSON-RPC 2.0 bridge encode/decode/dispatch
+        bc_sandbox_discovery.erl   %% generate /tools/ filesystem for container
+        bc_tool_exec.erl           %% bc_tool behaviour: sandboxed code execution
+        bc_pii_tokenizer.erl       %% gen_server: bidirectional PII masking
+        bc_sandbox_policy.erl      %% pure: tool access allow/deny rules
+        bc_sandbox_env.erl         %% pure: env var allowlist/blocklist filtering
+        bc_sandbox_skills.erl      %% pure: save/load sandbox scripts as SKILL.md
+      priv/
+        docker/
+          Dockerfile.sandbox       %% python:3.12-alpine sandbox image
+          bridge/
+            __init__.py
+            beamclaw_bridge.py     %% Python bridge: search_tools, call_tool
     beamclaw_mcp/src/
       beamclaw_mcp.app.src
       beamclaw_mcp_app.erl
@@ -704,5 +768,5 @@ beamclaw/
       bc_webhook_telegram_h.erl
     beamclaw_cli/src/
       beamclaw_cli.app.src
-      beamclaw_cli.erl        %% escript main; 22 commands (tui/start/stop/restart/remote_console/agent create/list/show/delete/rehatch/skills list/status/show/install/pair/pair list/pair approve/pair revoke/doctor/status/version/help)
+      beamclaw_cli.erl        %% escript main; 26 commands (tui/start/stop/restart/remote_console/agent create/list/show/delete/rehatch/skills list/status/show/install/pair/pair list/pair approve/pair revoke/sandbox status/list/kill/build/doctor/status/version/help)
 ```

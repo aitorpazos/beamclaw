@@ -2,7 +2,7 @@
 
 ## Current Phase: Implementation
 
-Scaffolding is complete. All seven OTP apps compile clean with zero warnings.
+Scaffolding is complete. All eight OTP apps compile clean with zero warnings.
 Multi-agent workspaces (M11–M13), rich templates (M14), daily logs (M15),
 skill system (M16–M17), session persistence (M18), cross-channel session
 sharing (M19), Telegram pairing access control (M20), and typing indicators
@@ -10,7 +10,8 @@ sharing (M19), Telegram pairing access control (M20), and typing indicators
 bootstrap file routing and pre-compaction memory flush (Post-M20) added.
 Memory search with BM25 + vector hybrid (M21–M23) is complete.
 Telegram photo/vision support (M24) is complete.
-308 EUnit tests pass.
+Docker sandbox code execution with MCP tool bridge (M25–M30) is complete.
+407 EUnit tests pass.
 
 ---
 
@@ -481,6 +482,74 @@ All six OTP apps created, supervision trees defined, behaviours declared,
 | EUnit tests | ✅ | 25 new: 16 (photo), 7 (vision provider), 2 (session store migration) |
 | Docs update | ✅ | CLAUDE.md, STATUS.md, configuration.md |
 
+### M25 — Sandbox Foundation (Docker Lifecycle + Bridge) ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `beamclaw_sandbox` app scaffold | ✅ | New OTP app: app.src, app, sup; deps: kernel, stdlib, jsx, obs, tools |
+| `bc_sandbox_registry` | ✅ | gen_server; ETS `{session_id, scope}` → pid; PID monitors |
+| `bc_sandbox_sup` | ✅ | simple_one_for_one for bc_sandbox gen_servers |
+| `bc_sandbox` | ✅ | Per-sandbox Docker lifecycle gen_server; Unix socket bridge; exec_script/4 |
+| `bc_sandbox_docker` | ✅ | Pure: Docker run/exec/kill/rm arg building; security flags |
+| `bc_sandbox_bridge` | ✅ | JSON-RPC 2.0 encode/decode; dispatch search_tools/get_tool_schema/call_tool |
+| `Dockerfile.sandbox` | ✅ | python:3.12-alpine; bridge module; non-root user |
+| `beamclaw_bridge.py` | ✅ | Python bridge: search_tools, get_tool, call_tool over Unix socket |
+| `rebar.config` update | ✅ | Added beamclaw_sandbox to escript_incl_apps, shell.apps, relx.release |
+| `sys.config` + `sys.docker.config` | ✅ | Full sandbox config section (enabled=false default) |
+| EUnit tests | ✅ | 42 tests: docker (19) + bridge (17) + registry (6) |
+
+### M26 — `bc_tool_exec` + Progressive Tool Discovery ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_tool_exec` | ✅ | bc_tool behaviour in beamclaw_sandbox; params: script, language, timeout, skill, save_as |
+| `bc_sandbox_discovery` | ✅ | Generate /tools/ filesystem: index.txt, descriptions, schemas |
+| `bc_tool_registry` update | ✅ | Added `list_names/0`, `get_definition/1` APIs |
+| `bc_loop` update | ✅ | Inject `tool_bridge_fn` into Context map via `make_tool_bridge_fn/1` |
+| `beamclaw_sandbox_app` update | ✅ | Register bc_tool_exec on start when sandbox enabled |
+| EUnit tests | ✅ | 13 tests: tool_exec (7) + discovery (6) |
+
+### M27 — PII Tokenization ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_pii_tokenizer` | ✅ | gen_server; ETS forward/reverse mapping; token format `<<PII:tok_NNNN>>` |
+| Patterns | ✅ | OpenAI keys, GitHub PATs, AWS keys, Bearer tokens, emails, credit cards, SSN, phone numbers |
+| Custom patterns | ✅ | Configurable via `#{patterns => [...]}` on start_link |
+| EUnit tests | ✅ | 15 tests: all patterns, roundtrip, idempotency, clear, custom, edge cases |
+
+### M28 — Tool Policy + Security Hardening ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_sandbox_policy` | ✅ | Pure: `check/2` with exact match + wildcard glob (`<<"mcp:*">>`); default rules |
+| `bc_sandbox_env` | ✅ | Pure: allowlist/blocklist env var filtering; `is_dangerous/1` |
+| EUnit tests | ✅ | 19 tests: policy (10) + env (9) |
+
+### M29 — Skills Persistence + Code Pattern Caching ✅
+
+| Module/Task | Status | Notes |
+|-------------|--------|-------|
+| `bc_sandbox_skills` | ✅ | Pure: generate/extract SKILL.md; save/load scripts; hash-based versioning |
+| EUnit tests | ✅ | 9 tests: format, hash, language, extract, roundtrip, save/load |
+
+### M30 — CLI, Docs, Integration ✅
+
+| Task | Status | Notes |
+|------|--------|-------|
+| `beamclaw sandbox status` | ✅ | Docker availability, image status, config |
+| `beamclaw sandbox list` | ✅ | Active sandbox containers |
+| `beamclaw sandbox kill ID` | ✅ | Force-kill a sandbox container |
+| `beamclaw sandbox build` | ✅ | Build sandbox Docker image from priv/docker/ |
+| `cmd_doctor` Docker check | ✅ | Docker + sandbox image availability |
+| CLAUDE.md update | ✅ | File Layout, Dep Graph, Supervision Trees, Config, Commands |
+| STATUS.md update | ✅ | M25–M30 milestones |
+| DECISIONS.md update | ✅ | ADR-015 (Docker sandbox), ADR-016 (PII tokenization) |
+| docs/architecture.md update | ✅ | Eight-app graph, sandbox supervision tree, sandbox execution section |
+| docs/configuration.md update | ✅ | Sandbox config keys |
+| docs/running.md update | ✅ | Sandbox CLI commands, setup and usage |
+| docs/building.md update | ✅ | Sandbox image build instructions |
+
 ---
 
 ## Known Issues / Blockers
@@ -491,4 +560,4 @@ _None at this time._
 
 ## Last Updated
 
-2026-02-24 (Telegram Photo/Vision Support — M24)
+2026-02-25 (Docker Sandbox Code Execution — M25–M30)

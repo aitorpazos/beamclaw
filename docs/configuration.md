@@ -217,6 +217,77 @@ mnesia:create_schema([node()]).
 This is typically done in a release start hook or setup script. In dev/test shells the
 backend automatically falls back to `ram_copies`.
 
+### beamclaw_sandbox
+
+```erlang
+{beamclaw_sandbox, [
+    %% Master switch — sandbox features require Docker.
+    %% When false (default), bc_tool_exec is not registered and all
+    %% sandbox features are disabled with zero overhead.
+    {enabled, false},
+
+    %% Docker image used for sandbox containers.
+    %% Build with: beamclaw sandbox build
+    {docker_image, "beamclaw-sandbox:latest"},
+
+    %% Sandbox scope: how containers are shared.
+    %% session — one container per session (default)
+    %% agent   — one container per agent
+    %% shared  — single global container
+    {scope, session},
+
+    %% Script execution timeout (seconds).
+    {timeout_seconds, 60},
+
+    %% Docker resource limits.
+    {memory_limit, "512m"},
+    {cpu_limit, "1.0"},
+
+    %% Container network mode.
+    %% none   — no network access (most secure, default)
+    %% bridge — Docker bridge network
+    %% host   — host network (not recommended)
+    {network, none},
+
+    %% Workspace mount mode inside container.
+    %% none — no workspace access
+    %% ro   — read-only (default)
+    %% rw   — read-write
+    {workspace_mount, ro},
+
+    %% Maximum script output size (bytes). Output beyond this is truncated.
+    {max_output_bytes, 1048576},   %% 1 MB
+
+    %% Directory for Unix domain sockets connecting to containers.
+    {bridge_socket_dir, "/tmp/beamclaw-bridges"},
+
+    %% PII tokenization at sandbox boundary.
+    {pii, #{
+        enabled          => true,   %% enable bidirectional PII masking
+        patterns         => [],     %% additional custom regex patterns
+        tokenize_scripts => true,   %% mask secrets in scripts sent to container
+        tokenize_results => true    %% mask secrets in results from container
+    }},
+
+    %% Tool access policy for bridge calls from container.
+    {policy, #{
+        default_action => allow,
+        rules => [
+            {allow, <<"read_file">>},
+            {allow, <<"curl">>},
+            {deny, <<"bash">>},
+            {deny, <<"terminal">>}
+        ]
+    }},
+
+    %% Environment variable filtering for container.
+    %% Only allowlisted vars are passed; blocklisted vars are always excluded.
+    {env_allowlist, [<<"PATH">>, <<"HOME">>, <<"LANG">>, <<"TERM">>]},
+    {env_blocklist, [<<"OPENROUTER_API_KEY">>, <<"OPENAI_API_KEY">>,
+                     <<"TELEGRAM_BOT_TOKEN">>, <<"AWS_SECRET_ACCESS_KEY">>]}
+]}
+```
+
 ### beamclaw_obs
 
 ```erlang
@@ -286,7 +357,7 @@ Key flags in `config/vm.args`:
 
 ## Docker-Specific Config (sys.docker.config)
 
-`config/sys.docker.config` is identical to `sys.config` with two differences:
+`config/sys.docker.config` is identical to `sys.config` with these differences:
 
 1. **TUI disabled**: `{tui, #{enabled => false}}` — stdin is not available in detached
    Docker containers.

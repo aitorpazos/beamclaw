@@ -620,3 +620,146 @@ compaction summary for future semantic recall.
 - BM25 scoring is O(N * M) where N = documents, M = query terms. This is
   acceptable for single-user workloads (N < 10,000). If corpus size grows
   significantly, an inverted index or external engine would be needed.
+
+---
+
+## ADR-015 — Docker sandbox for code execution with MCP tool bridge
+
+**Date**: 2026-02-25
+**Status**: Accepted
+
+### Context
+
+The Anthropic "Code Execution with MCP" pattern describes a system where,
+instead of the LLM making N separate tool calls (each a round-trip through
+the context window), the agent writes a **script** that runs in a sandbox,
+discovers MCP tools via a filesystem, calls them locally, and returns only
+the filtered/aggregated result. This achieves significant token reduction
+for data-heavy workflows.
+
+BeamClaw already has Docker-based execution via the `bash` and `terminal`
+tools, but these run directly on the host without tool bridging or
+progressive discovery. Adding sandbox isolation, tool bridging, PII
+tokenization, and environment hardening requires a dedicated subsystem.
+
+### Decision
+
+Implement a new `beamclaw_sandbox` OTP application with:
+
+1. **Docker container lifecycle** (`bc_sandbox`) — one gen_server per sandbox
+   container, with `--cap-drop ALL`, `--read-only`, `--security-opt
+   no-new-privileges`, `--network none`, memory/CPU limits, and PID limits.
+
+2. **Unix domain socket bridge** — the container communicates with BeamClaw
+   via a mounted Unix socket. A Python bridge module (`beamclaw_bridge.py`)
+   provides `search_tools()`, `get_tool()`, `call_tool()` functions. The
+   Erlang side (`bc_sandbox_bridge`) dispatches JSON-RPC 2.0 requests to
+   `bc_tool_registry` and `bc_mcp_registry` via a `tool_bridge_fn` callback
+   injected by `bc_loop`.
+
+3. **Progressive tool discovery** (`bc_sandbox_discovery`) — generates a
+   `/tools/` filesystem mounted into the container with `index.txt`,
+   per-tool `description.txt` and `schema.json` files. The agent's script
+   uses filesystem reads for discovery (no bridge round-trip) and the
+   bridge only for invocation.
+
+4. **PII tokenization** (`bc_pii_tokenizer`) — bidirectional masking at the
+   sandbox boundary. Scripts entering the container have secrets tokenized;
+   tool call arguments from the container are detokenized; results going
+   back are re-tokenized. Token format: `<<PII:tok_NNNN>>`.
+
+5. **Tool policy** (`bc_sandbox_policy`) — fine-grained allow/deny rules
+   with exact match and wildcard patterns (`<<"mcp:*">>`). Default: deny
+   `bash`, `terminal`, `exec` (prevent recursive sandbox).
+
+6. **Environment hardening** (`bc_sandbox_env`) — allowlist/blocklist
+   filtering of env vars. API keys are never exposed to containers; tools
+   needing them get server-side injection via the bridge dispatcher.
+
+7. **`bc_tool_exec`** — the agent-facing tool. Implemented as a `bc_tool`
+   behaviour in `beamclaw_sandbox` (not `beamclaw_tools`) to avoid a
+   dependency cycle. Registered conditionally via `bc_tool_registry:register/2`
+   on app start when sandbox is enabled.
+
+The sandbox is **opt-in** (`{enabled, false}` default) and requires Docker
+on the host.
+
+### Rationale
+
+- **Separate OTP app**: `beamclaw_tools` is a leaf dependency. Docker
+  lifecycle, PII tokenization, and bridge networking would bloat it.
+  A separate app provides clear ownership, independent testing, and zero
+  overhead when disabled.
+- **Unix sockets over TCP**: work with `--network none`, have filesystem
+  permissions, and lower overhead than TCP loopback.
+- **`tool_bridge_fn` callback**: `bc_loop` injects a closure that captures
+  access to both registries, avoiding a dependency cycle between
+  `beamclaw_sandbox` and `beamclaw_core`.
+- **Python bridge**: the primary use case is Python data processing scripts.
+  The bridge module is a single-file library with zero external dependencies.
+
+### Consequences
+
+- `beamclaw_sandbox` is a new sibling dep of `beamclaw_core` (8 apps total).
+- Docker must be installed and accessible for sandbox features.
+- The `beamclaw-sandbox:latest` Docker image must be built separately
+  (`beamclaw sandbox build` CLI command).
+- PII tokenization adds latency at boundary crossings; patterns must be
+  tuned to avoid false positives on legitimate content.
+- The sandbox is isolated from the host network by default; external API
+  calls must go through the tool bridge.
+
+---
+
+## ADR-016 — PII tokenization at sandbox boundary
+
+**Date**: 2026-02-25
+**Status**: Accepted
+
+### Context
+
+When the agent writes code that processes sensitive data (API keys, email
+addresses, credit card numbers), those values must not leak into the
+sandbox container's environment. Conversely, tool results may contain
+sensitive data that should not be returned verbatim to the LLM context
+window (which is already handled by `bc_scrubber` for tool results, but
+not for sandbox-mediated tool calls).
+
+### Decision
+
+Implement `bc_pii_tokenizer` as a gen_server with bidirectional mapping:
+
+- **Tokenize**: replace sensitive values with deterministic tokens
+  (`<<PII:tok_0001>>`, `<<PII:tok_0002>>`, etc.)
+- **Detokenize**: restore original values from tokens
+- **Idempotent**: the same input always maps to the same token within a
+  session
+- **Patterns**: OpenAI keys (`sk-`), GitHub PATs (`ghp_`), AWS keys
+  (`AKIA`), Bearer tokens, emails, credit cards (4-group Luhn-like),
+  SSN, phone numbers, custom patterns from config
+
+Data flow at sandbox boundary:
+1. Script → container: `tokenize(Script)` — mask secrets in code
+2. Tool call from container: `detokenize(Args)` — restore for real tools
+3. Tool result to container: `tokenize(Result)` — mask in responses
+4. Final output to LLM: `detokenize(Output)` — restore for model context
+
+### Rationale
+
+- Defense-in-depth: `bc_scrubber` handles tool results at the history
+  boundary; `bc_pii_tokenizer` handles the sandbox boundary. Different
+  threat models: scrubber prevents LLM exposure, tokenizer prevents
+  container exposure.
+- Bidirectional mapping preserves semantic content: the LLM sees tokens
+  that can be restored, unlike `[REDACTED]` which destroys information.
+- Per-session gen_server provides isolation: tokens from one session
+  cannot be resolved in another.
+
+### Consequences
+
+- One gen_server per sandbox session adds per-session memory overhead
+  (~few KB for the ETS tables).
+- Regex-based detection has inherent false positive/negative trade-offs;
+  custom patterns allow tuning for specific use cases.
+- Tokens are opaque to the sandbox code; scripts that need to parse or
+  validate secrets (e.g., check key format) will see tokens instead.

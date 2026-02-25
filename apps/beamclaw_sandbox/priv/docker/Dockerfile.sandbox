@@ -1,0 +1,19 @@
+FROM python:3.12-alpine
+
+# Minimal sandbox image for BeamClaw code execution.
+# The Python bridge module provides search_tools(), get_tool(), call_tool()
+# for discovering and invoking BeamClaw tools from within scripts.
+
+RUN adduser -D -h /home/sandbox sandbox
+
+# Install the bridge module
+COPY bridge/ /opt/beamclaw_bridge/
+ENV PYTHONPATH="/opt/beamclaw_bridge"
+
+# Working directory for scripts
+WORKDIR /tmp
+
+USER sandbox
+
+# Container stays alive; scripts run via `docker exec`
+ENTRYPOINT ["sleep", "infinity"]
