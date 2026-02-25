@@ -317,7 +317,17 @@ send_message(_ChatId, <<>>, _State) ->
     ok;
 send_message(_ChatId, <<"">>, _State) ->
     ok;
+send_message(_ChatId, <<>>, _State) ->
+    ok;
+send_message(ChatId, Text, #{token := Token}) when is_binary(Text) ->
+    case string:trim(Text) of
+        <<>> -> ok;
+        _ -> send_message_impl(ChatId, Text, Token)
+    end;
 send_message(ChatId, Text, #{token := Token}) ->
+    send_message_impl(ChatId, Text, Token).
+
+send_message_impl(ChatId, Text, Token) ->
     Url  = "https://api.telegram.org/bot" ++ Token ++ "/sendMessage",
     Body = jsx:encode(#{chat_id => ChatId, text => Text}),
     case httpc:request(post, {Url, [], "application/json", Body},
