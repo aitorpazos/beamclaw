@@ -190,8 +190,11 @@ streaming(cast, do_stream, Data) ->
 streaming(EventType, EventContent, Data) ->
     handle_common(streaming, EventType, EventContent, Data).
 
-awaiting_approval(enter, _OldState, Data) ->
-    {keep_state, Data};
+awaiting_approval(enter, _OldState, _Data) ->
+    %% TODO: wire up bc_approval channel prompting for interactive approval.
+    %% For now, auto-approve (matches bc_approval's current supervised-mode behaviour).
+    self() ! {approval_result, all, approved},
+    keep_state_and_data;
 awaiting_approval(info, {approval_result, _ToolCallId, approved}, Data) ->
     {next_state, executing_tools, Data};
 awaiting_approval(info, {approval_result, _ToolCallId, denied}, Data) ->
