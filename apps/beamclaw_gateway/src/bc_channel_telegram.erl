@@ -154,7 +154,12 @@ process_updates(Updates, State) ->
         case sets:is_element(MsgId, Seen) of
             true  -> {Seen, max(Max, UpdateId)};
             false ->
-                dispatch_telegram_message(Update),
+                spawn(fun() ->
+                    try dispatch_telegram_message(Update)
+                    catch C:R:St ->
+                        logger:error("[telegram] dispatch crashed: ~p:~p~n~p", [C, R, St])
+                    end
+                end),
                 {sets:add_element(MsgId, Seen), max(Max, UpdateId)}
         end
     end, {SeenIds, maps:get(offset, State, 0)}, Updates),
