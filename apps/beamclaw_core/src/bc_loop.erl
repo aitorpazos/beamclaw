@@ -403,16 +403,25 @@ execute_tool_calls(Data) ->
 
 run_tool(#bc_tool_call{name = Name, args = Args}, SessionRef) ->
     Context = #{tool_bridge_fn => make_tool_bridge_fn(SessionRef)},
-    case bc_tool_registry:lookup(Name) of
-        {ok, {Mod, _Def}} ->
-            Mod:execute(Args, SessionRef, Context);
-        {error, not_found} ->
-            case bc_mcp_registry:lookup(Name) of
-                {ok, {ServerPid, _}} ->
-                    bc_mcp_server:call_tool(ServerPid, Name, Args);
-                {error, not_found} ->
-                    {error, <<"tool not found">>}
-            end
+    try
+        case bc_tool_registry:lookup(Name) of
+            {ok, {Mod, _Def}} ->
+                Mod:execute(Args, SessionRef, Context);
+            {error, not_found} ->
+                case bc_mcp_registry:lookup(Name) of
+                    {ok, {ServerPid, _}} ->
+                        bc_mcp_server:call_tool(ServerPid, Name, Args);
+                    {error, not_found} ->
+                        {error, <<"tool not found">>}
+                end
+        end
+    catch
+        Class:Reason:Stack ->
+            logger:error("[loop] tool ~s crashed: ~p:~p~n~p",
+                         [Name, Class, Reason, Stack]),
+            ErrMsg = iolist_to_binary(
+                io_lib:format("Tool crashed: ~p:~p", [Class, Reason])),
+            {error, ErrMsg}
     end.
 
 %% Build a tool bridge callback for sandbox use. Captures access to both
