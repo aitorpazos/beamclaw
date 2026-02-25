@@ -337,7 +337,11 @@ receive_stream(Data, T0, TickRef) ->
             %% auto-clears typing when the message is delivered.
             emit_typing(Data),
             cancel_typing_tick(TickRef),
-            ToolCalls = bc_tool_parser:parse(ScrubbedMsg),
+            ToolCalls = try bc_tool_parser:parse(ScrubbedMsg)
+            catch E2:R2:St2 ->
+                logger:error("[loop] tool_parser crashed: ~p:~p ~p", [E2, R2, St2]),
+                []
+            end,
             NewData = Data#loop_data{tool_calls = ToolCalls},
             case ToolCalls of
                 [] ->
