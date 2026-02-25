@@ -298,8 +298,15 @@ receive_stream(Data, T0, TickRef) ->
                                         duration_ms => Duration, success => true}),
             ScrubbedMsg = bc_scrubber:scrub_message(FullMsg),
             bc_session:append_message(Data#loop_data.session_pid, ScrubbedMsg),
-            route_response(Data, ScrubbedMsg),
-            ToolCalls = bc_tool_parser:parse(ScrubbedMsg),
+            try route_response(Data, ScrubbedMsg)
+            catch E:R:St ->
+                logger:error("[loop] route_response crashed: ~p:~p ~p", [E, R, St])
+            end,
+            ToolCalls = try bc_tool_parser:parse(ScrubbedMsg)
+            catch E2:R2:St2 ->
+                logger:error("[loop] tool_parser crashed: ~p:~p ~p", [E2, R2, St2]),
+                []
+            end,
             NewData = Data#loop_data{tool_calls = ToolCalls},
             case ToolCalls of
                 [] -> {next_state, finalizing, NewData};
