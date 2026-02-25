@@ -312,6 +312,11 @@ resolve_token() ->
     TgConfig = proplists:get_value(telegram, Channels, #{}),
     bc_config:resolve(maps:get(token, TgConfig, {env, "TELEGRAM_BOT_TOKEN"})).
 
+send_message(_ChatId, <<>>, _State) ->
+    %% Skip sending empty messages (e.g. tool-only LLM responses).
+    ok;
+send_message(_ChatId, <<"">>, _State) ->
+    ok;
 send_message(ChatId, Text, #{token := Token}) ->
     Url  = "https://api.telegram.org/bot" ++ Token ++ "/sendMessage",
     Body = jsx:encode(#{chat_id => ChatId, text => Text}),
