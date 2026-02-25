@@ -625,9 +625,28 @@ cmd_pair_revoke(Channel, UserId) ->
 
 -doc "Show sandbox configuration and Docker availability.".
 cmd_sandbox_status() ->
-    Enabled = application:get_env(beamclaw_sandbox, enabled, false),
-    Image = application:get_env(beamclaw_sandbox, docker_image,
-                                "beamclaw-sandbox:latest"),
+    {Enabled, Image} = case try_connect_daemon() of
+        connected ->
+            E = case rpc:call(daemon_node(), application, get_env,
+                              [beamclaw_sandbox, enabled, false]) of
+                    {badrpc, _} ->
+                        application:get_env(beamclaw_sandbox, enabled, false);
+                    Val -> Val
+                end,
+            I = case rpc:call(daemon_node(), application, get_env,
+                              [beamclaw_sandbox, docker_image,
+                               "beamclaw-sandbox:latest"]) of
+                    {badrpc, _} ->
+                        application:get_env(beamclaw_sandbox, docker_image,
+                                            "beamclaw-sandbox:latest");
+                    Val2 -> Val2
+                end,
+            {E, I};
+        not_running ->
+            {application:get_env(beamclaw_sandbox, enabled, false),
+             application:get_env(beamclaw_sandbox, docker_image,
+                                 "beamclaw-sandbox:latest")}
+    end,
     io:format("Sandbox status:~n"),
     io:format("  Enabled:  ~p~n", [Enabled]),
     io:format("  Image:    ~s~n", [Image]),
