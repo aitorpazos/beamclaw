@@ -1091,6 +1091,7 @@ check_pairing_dir() ->
 
 check_openrouter_network() ->
     application:ensure_all_started(inets),
+    application:ensure_all_started(ssl),
     Url = "https://openrouter.ai/api/v1/models",
     case httpc:request(get, {Url, []}, [{timeout, 5000}], []) of
         {ok, {{_, 200, _}, _, _}} ->
