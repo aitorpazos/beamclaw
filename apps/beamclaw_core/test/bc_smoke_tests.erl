@@ -37,6 +37,8 @@ set_loop_pid. bc_session queues it and drains on set_loop_pid — safe.
 %% ---- Fixtures ----
 
 setup() ->
+    %% Disable session persistence so Mnesia table absence doesn't crash tests
+    application:set_env(beamclaw_core, session_persistence, false),
     {ok, Started} = application:ensure_all_started(beamclaw_core),
     Started.
 
@@ -47,7 +49,8 @@ teardown(Started) ->
 
 smoke_test_() ->
     {foreach, fun setup/0, fun teardown/1, [
-        fun smoke_roundtrip/1
+        fun smoke_roundtrip/1,
+        fun tool_crash_resilience/1
     ]}.
 
 %% Dispatch a user message; assert the assistant reply appears in history.
@@ -77,3 +80,49 @@ do_roundtrip() ->
     ?assert(length(History) >= 1),
     AssistantMsgs = [M || M <- History, M#bc_message.role =:= assistant],
     ?assert(length(AssistantMsgs) >= 1).
+
+%% Tool crash: register a crashing tool, dispatch a message that triggers it,
+%% verify the loop survives and produces both a tool error result and a
+%% follow-up assistant response.
+tool_crash_resilience(_Started) ->
+    ?_test(do_tool_crash()).
+
+do_tool_crash() ->
+    %% Register the crashing mock tool
+    bc_tool_registry:register(bc_tool_crash_mock, bc_tool_crash_mock:definition()),
+
+    SessionId = <<"crash-test-session">>,
+    Config = #{
+        session_id   => SessionId,
+        provider_mod => bc_provider_toolcall_mock,
+        autonomy     => full
+    },
+    {ok, _SupPid} = bc_sessions_sup:start_session(Config),
+    {ok, SessionPid} = bc_session_registry:lookup(SessionId),
+
+    Msg = #bc_channel_message{
+        session_id = SessionId,
+        user_id    = <<"test">>,
+        channel    = tui,
+        content    = <<"use the crash tool">>,
+        raw        = <<"use the crash tool">>,
+        ts         = 0
+    },
+    bc_session:dispatch_run(SessionPid, Msg),
+    %% Wait for: stream(tool_call) → execute(crash) → stream(response)
+    timer:sleep(1000),
+
+    History = bc_session:get_history(SessionPid),
+    %% Should have: user msg, assistant(tool_call), tool(error), assistant(response)
+    ?assert(length(History) >= 3),
+
+    %% The tool result should contain the crash error
+    ToolMsgs = [M || M <- History, M#bc_message.role =:= tool],
+    ?assert(length(ToolMsgs) >= 1),
+    [ToolMsg | _] = ToolMsgs,
+    ?assertNotEqual(nomatch,
+        binary:match(ToolMsg#bc_message.content, <<"Tool crashed">>)),
+
+    %% The loop survived — there should be a follow-up assistant response
+    AssistantMsgs = [M || M <- History, M#bc_message.role =:= assistant],
+    ?assert(length(AssistantMsgs) >= 2).
