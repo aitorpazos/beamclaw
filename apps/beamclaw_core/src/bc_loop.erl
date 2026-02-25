@@ -385,7 +385,8 @@ maybe_await_approval(#loop_data{tool_calls = Calls} = Data) ->
             _               -> false
         end
     end, Calls),
-    case NeedsApproval of
+    Autonomy = bc_config:get(beamclaw_core, autonomy_level, supervised),
+    case NeedsApproval andalso Autonomy =/= autonomous of
         true  -> {next_state, awaiting_approval, Data};
         false -> {next_state, executing_tools, Data}
     end.
