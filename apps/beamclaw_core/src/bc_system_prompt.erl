@@ -76,7 +76,10 @@ assemble(AgentId, Config) ->
                 [] -> [fallback_message()];
                 _  -> BootstrapMsgs
             end,
-            BaseMsgs ++ DailyMsgs ++ SkillMsgs
+            AllMsgs = BaseMsgs ++ DailyMsgs ++ SkillMsgs,
+            %% Cap system prompt to ~50k tokens (~200KB) to leave room for conversation
+            MaxSystemBytes = maps:get(max_system_bytes, Config, 200000),
+            trim_to_budget(AllMsgs, MaxSystemBytes)
     end.
 
 %% Internal
@@ -167,6 +170,24 @@ yesterday_date() ->
     Today = calendar:date_to_gregorian_days(date()),
     {Y, M, D} = calendar:gregorian_days_to_date(Today - 1),
     iolist_to_binary(io_lib:format("~4..0B-~2..0B-~2..0B", [Y, M, D])).
+
+%% Trim system messages to fit within a byte budget.
+%% Drops from the end (skills first, then daily logs) since bootstrap files
+%% (IDENTITY, SOUL, USER, etc.) are most important.
+trim_to_budget(Msgs, MaxBytes) ->
+    trim_to_budget(Msgs, MaxBytes, 0, []).
+
+trim_to_budget([], _Max, _Used, Acc) ->
+    lists:reverse(Acc);
+trim_to_budget([#bc_message{content = C} = M | Rest], Max, Used, Acc) ->
+    Size = byte_size(C),
+    case Used + Size =< Max of
+        true  -> trim_to_budget(Rest, Max, Used + Size, [M | Acc]);
+        false ->
+            logger:info("[system_prompt] budget exceeded (~B bytes used, ~B limit), dropping ~B remaining messages",
+                        [Used, Max, length(Rest) + 1]),
+            lists:reverse(Acc)
+    end.
 
 is_blank(Bin) ->
     Trimmed = string:trim(Bin),
