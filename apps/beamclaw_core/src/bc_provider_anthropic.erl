@@ -57,7 +57,8 @@ terminate(_Reason, _State) ->
 
 build_request_body(Messages, Options, #{model := Model, max_tokens := MaxTok}) ->
     {SystemText, NonSystemMsgs} = extract_system(Messages),
-    AnthropicMsgs = merge_consecutive(lists:map(fun message_to_anthropic/1, NonSystemMsgs)),
+    TruncatedMsgs = truncate_to_token_limit(NonSystemMsgs, 180000),
+    AnthropicMsgs = merge_consecutive(lists:map(fun message_to_anthropic/1, TruncatedMsgs)),
     Base = #{
         model      => list_to_binary(Model),
         max_tokens => MaxTok,
@@ -164,6 +165,48 @@ encode_params(V) when is_atom(V) ->
     atom_to_binary(V, utf8);
 encode_params(V) ->
     V.
+
+%% Estimate tokens (~4 chars/token) and drop oldest messages (keeping the
+%% first system-adjacent message and last N) until under the limit.
+%% Ensures orphaned tool_use blocks are not left without tool_result.
+truncate_to_token_limit(Messages, MaxTokens) ->
+    EstTokens = estimate_tokens(Messages),
+    case EstTokens =< MaxTokens of
+        true  -> Messages;
+        false ->
+            Len = length(Messages),
+            %% Keep last 60% of messages, drop from front
+            Keep = max(4, Len div 2),
+            Trimmed = lists:nthtail(Len - Keep, Messages),
+            %% Ensure first message isn't a tool result (orphan)
+            Cleaned = drop_leading_tool_results(Trimmed),
+            logger:warning("[anthropic] truncated history from ~B to ~B msgs (~B est tokens > ~B limit)",
+                           [Len, length(Cleaned), EstTokens, MaxTokens]),
+            truncate_to_token_limit(Cleaned, MaxTokens)
+    end.
+
+estimate_tokens(Messages) ->
+    lists:foldl(fun(#bc_message{content = C, tool_calls = TCs}, Acc) ->
+        ContentSize = case C of
+            undefined -> 0;
+            B when is_binary(B) -> byte_size(B);
+            _ -> 0
+        end,
+        ToolSize = lists:foldl(fun
+            ({bc_tool_call, _, _, Args, _}, A) when is_map(Args) ->
+                A + byte_size(jsx:encode(Args));
+            (_, A) -> A
+        end, 0, TCs),
+        Acc + (ContentSize + ToolSize) div 4
+    end, 0, Messages).
+
+drop_leading_tool_results([#bc_message{role = tool} | Rest]) ->
+    drop_leading_tool_results(Rest);
+drop_leading_tool_results([#bc_message{role = assistant, tool_calls = TCs} | Rest])
+  when TCs =/= [], TCs =/= undefined ->
+    %% Assistant with tool_use but tool_results were dropped — skip it too
+    drop_leading_tool_results(Rest);
+drop_leading_tool_results(Msgs) -> Msgs.
 
 %% ---- HTTP ----
 
