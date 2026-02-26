@@ -114,15 +114,15 @@ sanitize_history(Messages) ->
           not (R =:= assistant andalso (C =:= undefined orelse C =:= <<>>)
                andalso (TCs =:= [] orelse TCs =:= undefined))].
 
+%% Drop any leading messages that would be invalid at the start of a conversation:
+%% - tool results without preceding tool_use
+%% - assistant messages with tool_calls (since their tool_results may have been dropped)
 drop_leading_tool_results([#bc_message{role = tool} | Rest]) ->
     drop_leading_tool_results(Rest);
-drop_leading_tool_results([#bc_message{role = assistant, tool_calls = TCs} | Rest])
-  when TCs =/= [], TCs =/= undefined ->
-    %% Check if next message is the tool_result
-    case Rest of
-        [#bc_message{role = tool} | _] -> [hd(Rest) | Rest]; % keep pair — wrong, keep original
-        _ -> drop_leading_tool_results(Rest) % orphaned, skip
-    end;
+drop_leading_tool_results([#bc_message{role = assistant, content = C, tool_calls = TCs} | Rest])
+  when TCs =/= [], TCs =/= undefined, (C =:= undefined orelse C =:= <<>>) ->
+    %% Pure tool_use assistant message with no text — drop it and its results
+    drop_leading_tool_results(Rest);
 drop_leading_tool_results(Msgs) -> Msgs.
 
 fix_orphaned_tool_uses([]) -> [];
