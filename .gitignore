@@ -27,3 +27,4 @@ test/logs/
 *.secret
 priv/secrets/
 Mnesia.*
+Mnesia.nonode@nohost/
