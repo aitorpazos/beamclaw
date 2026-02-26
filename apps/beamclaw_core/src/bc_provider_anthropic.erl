@@ -48,8 +48,8 @@ complete_with_retry(Messages, Options, State, RetriesLeft) ->
                     SystemMsgs = [M || #bc_message{role = R} = M <- Messages, R =:= system],
                     %% Aggressively drop first half of non-system messages
                     Len = length(NonSystem),
-                    Keep = max(2, Len div 2),
-                    Trimmed = lists:nthtail(Len - Keep, NonSystem),
+                    Drop = max(1, Len div 2),
+                    Trimmed = lists:nthtail(min(Drop, Len - 1), NonSystem),
                     Cleaned = sanitize_history(Trimmed),
                     complete_with_retry(SystemMsgs ++ Cleaned, Options, State, RetriesLeft - 1);
                 false ->
@@ -298,8 +298,8 @@ truncate_to_token_limit(Messages, MaxTokens) ->
                 true -> Messages; %% Can't truncate further
                 false ->
                     %% Drop first third of messages
-                    Drop = max(2, Len div 3),
-                    Trimmed = lists:nthtail(Drop, Messages),
+                    Drop = max(1, Len div 3),
+                    Trimmed = lists:nthtail(min(Drop, Len - 1), Messages),
                     Cleaned = sanitize_history(Trimmed),
                     logger:warning("[anthropic] truncated history: ~B→~B msgs (~B est tokens > ~B limit)",
                                    [Len, length(Cleaned), EstTokens, MaxTokens]),
